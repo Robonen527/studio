@@ -67,7 +67,7 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
             <FormItem>
               <FormLabel>שם משתמש</FormLabel>
               <FormControl>
-                <Input placeholder="admin" {...field} />
+                <Input placeholder="הכנס שם משתמש" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -80,7 +80,7 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
             <FormItem>
               <FormLabel>סיסמה</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="admin" {...field} />
+                <Input type="password" placeholder="הכנס סיסמה" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
