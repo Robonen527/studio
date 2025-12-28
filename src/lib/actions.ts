@@ -3,29 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { parshiot } from "./parshiot";
 import type { Insight, Parsha } from "./types";
+import { HDate, Sedra, Event } from 'hebcal';
+import { insightsStore } from "./data";
 
 // Simulate network delay
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-// In-memory store for insights
-let insightsStore: Insight[] = [
-    {
-        id: "1",
-        parshaSlug: "vayechi",
-        title: "ברכת יעקב לבניו",
-        author: "הרב יונתן זקס",
-        content: "פרשת ויחי מסיימת את ספר בראשית ואת סיפור חייהם של האבות. יעקב, על ערש דווי, אוסף את בניו כדי לברך אותם. ברכותיו אינן רק איחולים לעתיד, אלא גם נבואות ותוכחות המעצבות את זהותם של שבטי ישראל. כל ברכה מותאמת לאופיו ולמעשיו של כל בן, ומכאן אנו למדים על חשיבות ההכרה בייחודיותו של כל אדם ועל האחריות הנלווית לכך.",
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-        id: "2",
-        parshaSlug: "bereshit",
-        title: "בריאת העולם והאור הראשון",
-        author: "הרב קוק",
-        content: "בראשית ברא אלוהים את השמים ואת הארץ. הפסוק הפותח את התורה הוא גם המסד לכל האמונה. מעשה הבריאה מלמד אותנו על כוחו האינסופי של הבורא ועל הסדר המופתי שהטביע בעולם. האור הראשון שנברא לא היה אור פיזי, אלא אור רוחני עליון, 'אור הגנוז', שממנו יכולים צדיקים ליהנות. תפקידנו בעולם הוא לחשוף את אותו אור גנוז במעשינו.",
-        createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    }
-];
 
 export async function getParshiot() {
   await delay(500);
@@ -68,8 +50,34 @@ export async function getInsightById(id: string) {
     return insightsStore.find(i => i.id === id) || null;
 }
 
-export async function getCurrentParsha() {
+export async function getCurrentParsha(): Promise<Parsha> {
     await delay(100);
+    
+    try {
+        const today = new HDate();
+        const saturday = today.onOrAfter(6); // 6 is Shabbat
+        const sedra = new Sedra(saturday.getFullYear(), true);
+        const parshaName = sedra.get(saturday);
+
+        if (parshaName && parshaName.length) {
+            // hebcal might return multiple parshiot (e.g., "Matot-Masei")
+            // We'll try to find a match for the combined name first, then split.
+            const combinedSlug = parshaName.join('-').toLowerCase();
+            const combinedParsha = parshiot.find(p => p.slug === combinedSlug);
+            if (combinedParsha) return combinedParsha;
+
+            // If no combined match, find the first one that matches
+            const firstParshaName = parshaName[0];
+            const parshaInfo = parshiot.find(p => p.name === firstParshaName);
+            if (parshaInfo) {
+                return parshaInfo;
+            }
+        }
+    } catch(e) {
+        console.error("Could not determine current parsha, falling back to default.", e);
+    }
+    
+    // Fallback to a default if API fails or parsha not found
     const vayechi = parshiot.find(p => p.slug === 'vayechi');
     return vayechi || parshiot[11];
 }
