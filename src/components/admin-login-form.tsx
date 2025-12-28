@@ -23,7 +23,7 @@ import { useAuth } from "@/firebase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "כתובת אימייל לא חוקית." }),
-  password: z.string().min(6, { message: "הסיסמה חייבת להכיל לפחות 6 תווים." }),
+  password: z.string().min(4, { message: "הסיסמה חייבת להכיל לפחות 4 תווים." }),
 });
 
 type AdminLoginFormProps = {
@@ -46,20 +46,26 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
   function onSubmit(values: z.infer<typeof formSchema>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await signInWithEmailAndPassword(auth, values.email, values.password);
-        onSuccess();
-      } catch (e: any) {
-        switch (e.code) {
-          case 'auth/user-not-found':
-          case 'auth/wrong-password':
-          case 'auth/invalid-credential':
-            setError("שם המשתמש או הסיסמה שגויים.");
-            break;
-          default:
-            setError("אירעה שגיאה לא צפויה. נסה שוב מאוחר יותר.");
-            break;
+      // Hardcoded check for admin user
+      if (values.email.toLowerCase() === 'admin@example.com' && values.password === '1234') {
+        try {
+          // We still sign in to get a valid user session for Firestore rules.
+          // In a real app, this user should exist in Firebase Auth.
+          // For this demo, we can use a dummy/anonymous login or a pre-created user.
+          // Let's attempt to sign in, but the primary validation is the hardcoded check.
+          await signInWithEmailAndPassword(auth, values.email, values.password);
+          onSuccess();
+        } catch (e: any) {
+           // If the pre-defined admin user doesn't exist in Firebase, this will fail.
+           // For the demo, we will show a more specific error.
+            if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+                 setError("התחברות המנהל המוגדרת מראש נכשלה. ודא שהמשתמש admin@example.com קיים במערכת האימות של Firebase.");
+            } else {
+                setError("אירעה שגיאה לא צפויה באימות. נסה שוב מאוחר יותר.");
+            }
         }
+      } else {
+        setError("שם המשתמש או הסיסמה שגויים.");
       }
     });
   }
