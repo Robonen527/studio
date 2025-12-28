@@ -55,12 +55,18 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
 
     startTransition(async () => {
       try {
+        if (!auth || !firestore) {
+            setError("שירותי Firebase אינם זמינים. נסה לרענן את הדף.");
+            return;
+        }
+        
         const userCredential = await signInAnonymously(auth);
         const user = userCredential.user;
 
-        if (user && firestore) {
+        if (user) {
           // Grant admin role by creating a document in roles_admin collection
           const adminRoleRef = doc(firestore, `roles_admin/${user.uid}`);
+          // This setDoc operation needs to be allowed by security rules
           await setDoc(adminRoleRef, { username: 'admin_anonymous' });
           onSuccess();
         } else {
@@ -68,7 +74,11 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
         }
       } catch (e: any) {
         console.error("Anonymous sign-in error:", e);
-        setError("אירעה שגיאה לא צפויה באימות. נסה שוב מאוחר יותר.");
+        if (e.code === 'auth/network-request-failed') {
+             setError("שגיאת רשת. בדוק את חיבור האינטרנט שלך ונסה שוב.");
+        } else {
+            setError("אירעה שגיאה לא צפויה באימות. נסה שוב מאוחר יותר.");
+        }
       }
     });
   }

@@ -48,7 +48,7 @@ service cloud.firestore {
      * This enforces relational integrity at the point of creation.
      */
     function hasValidTorahInsightDataOnCreate(parshaId) {
-      return request.resource.data.parshaId == parshaId;
+      return request.resource.data.parshaSlug == parshaId;
     }
 
     /**
@@ -56,7 +56,7 @@ service cloud.firestore {
      * This protects the document's relationship to its parent Parsha.
      */
     function isTorahInsightParentImmutableOnUpdate() {
-      return request.resource.data.parshaId == resource.data.parshaId;
+      return request.resource.data.parshaSlug == resource.data.parshaSlug;
     }
 
     /**
