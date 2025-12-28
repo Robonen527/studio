@@ -91,8 +91,8 @@ export function DateDisplay() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground">
+      <div className="flex items-center gap-1.5">
         <CalendarDays className="h-4 w-4" />
         <span>{gregorianDate}</span>
       </div>
@@ -103,4 +103,3 @@ export function DateDisplay() {
     </div>
   );
 }
-

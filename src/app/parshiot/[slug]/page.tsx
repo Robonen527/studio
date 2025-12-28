@@ -72,12 +72,14 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
     <div className="container mx-auto px-4 py-8 md:py-12">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div className="mb-4 md:mb-0">
-          <h1 className="font-headline text-4xl md:text-5xl text-primary">פרשת {parsha.name}</h1>
+          <h1 className="font-headline text-3xl md:text-5xl text-primary">פרשת {parsha.name}</h1>
           <Link href="/parshiot" className="text-sm text-muted-foreground hover:text-primary transition-colors">
             &larr; חזרה לכל הפרשות
           </Link>
         </div>
-        <AddInsightButton parshaSlug={parsha.slug} />
+        <div className="mt-4 md:mt-0">
+          <AddInsightButton parshaSlug={parsha.slug} />
+        </div>
       </div>
 
       {isLoading ? (
@@ -92,10 +94,10 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
               <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="font-headline text-2xl text-accent-foreground">{insight.title}</CardTitle>
+                        <CardTitle className="font-headline text-xl md:text-2xl text-accent-foreground">{insight.title}</CardTitle>
                         <CardDescription>מאת {insight.author} | {new Date(insight.createdAt).toLocaleDateString('he-IL')}</CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 md:gap-2">
                         <EditInsightButton insight={insight} />
                         <DeleteInsightButton parshaSlug={parsha.slug} insightId={insight.id} />
                     </div>

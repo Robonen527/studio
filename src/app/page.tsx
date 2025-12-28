@@ -80,17 +80,19 @@ export default function Home() {
     <div className="container mx-auto px-4 py-8 md:py-12">
       <div className="flex flex-col items-center text-center mb-12">
         <h1 className="font-headline text-4xl md:text-6xl text-primary tracking-tight">מאיר בפרשה</h1>
-        <p className="mt-2 text-lg text-muted-foreground">מחשבות והארות על פרשת השבוע</p>
+        <p className="mt-2 text-md md:text-lg text-muted-foreground">מחשבות והארות על פרשת השבוע</p>
       </div>
 
       <Card className="w-full max-w-4xl mx-auto shadow-lg border-2 border-accent/50">
         <CardHeader>
-          <CardTitle className="font-headline text-3xl md:text-4xl text-primary flex items-center justify-between">
+          <CardTitle className="font-headline text-2xl md:text-4xl text-primary flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2">
               <span>פרשת השבוע: {currentParsha.name}</span>
               <SetCurrentParsha currentParshaSlug={currentParsha.slug} />
             </div>
-            <AddInsightButton parshaSlug={currentParsha.slug} />
+            <div className="self-start sm:self-center">
+              <AddInsightButton parshaSlug={currentParsha.slug} />
+            </div>
           </CardTitle>
           <CardDescription>
             {isLoadingInsights ? <Skeleton className="h-5 w-48" /> : (
@@ -108,8 +110,8 @@ export default function Home() {
             </div>
           ) : latestInsight ? (
             <div className="space-y-4">
-              <h3 className="font-headline text-2xl text-accent-foreground">{latestInsight.title}</h3>
-              <p className="text-lg/relaxed whitespace-pre-wrap">{latestInsight.content}</p>
+              <h3 className="font-headline text-xl md:text-2xl text-accent-foreground">{latestInsight.title}</h3>
+              <p className="text-base/relaxed md:text-lg/relaxed whitespace-pre-wrap">{latestInsight.content}</p>
               <div className="flex justify-center pt-4">
                 <Button asChild variant="outline">
                   <Link href={`/parshiot/${currentParsha.slug}`}>לכל דברי התורה על פרשת {currentParsha.name}</Link>
