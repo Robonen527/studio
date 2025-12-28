@@ -18,14 +18,14 @@ export function Header() {
             </Link>
         </div>
 
-        {/* Auth Button - pushed to the far end (left in RTL) */}
-        <div className="mr-auto md:mr-0">
-            <AuthButton />
+        {/* Date and Parsha display */}
+        <div className="md:mr-0 md:ml-auto">
+            <DateDisplay />
         </div>
 
-        {/* Date and Parsha display - full width on mobile, auto on desktop */}
+        {/* Auth Button */}
         <div className="w-full md:w-auto flex-1 md:flex-none flex justify-center md:justify-start">
-            <DateDisplay />
+            <AuthButton />
         </div>
       </div>
     </header>
