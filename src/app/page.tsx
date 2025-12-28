@@ -11,6 +11,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SetCurrentParsha } from '@/components/SetCurrentParsha';
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
@@ -61,7 +62,10 @@ export default function Home() {
       <Card className="w-full max-w-4xl mx-auto shadow-lg border-2 border-accent/50">
         <CardHeader>
           <CardTitle className="font-headline text-3xl md:text-4xl text-primary flex items-center justify-between">
-            <span>פרשת השבוע: {currentParsha.name}</span>
+            <div className="flex items-center gap-2">
+              <span>פרשת השבוע: {currentParsha.name}</span>
+              <SetCurrentParsha currentParshaSlug={currentParsha.slug} />
+            </div>
             <AddInsightButton parshaSlug={currentParsha.slug} />
           </CardTitle>
           <CardDescription>

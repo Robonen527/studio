@@ -1,13 +1,20 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { parshiot } from "./parshiot";
 import type { Parsha } from "./types";
 import { HDate, Sedra } from 'hebcal';
+import { initializeAdminApp } from "@/firebase/server";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+async function getFirestoreAdmin() {
+    const { firestore } = await initializeAdminApp();
+    return firestore;
+}
+
 
 export async function getParshiot() {
-  // In a real app, you might fetch this from a database
-  // For now, we'll simulate that by creating Parsha documents if they don't exist.
   return parshiot;
 }
 
@@ -29,6 +36,23 @@ export async function getParshaBySlug(slug: string) {
 
 export async function getCurrentParsha(): Promise<Parsha> {
     try {
+        const firestore = await getFirestoreAdmin();
+        const settingsRef = doc(firestore, 'settings', 'currentParsha');
+        const settingsDoc = await getDoc(settingsRef);
+
+        if (settingsDoc.exists()) {
+            const slug = settingsDoc.data().slug;
+            const manualParsha = await getParshaBySlug(slug);
+            if (manualParsha) {
+                return manualParsha;
+            }
+        }
+    } catch (e) {
+        console.error("Could not fetch manual parsha override:", e);
+    }
+    
+    // Fallback to Hebcal if no manual override is set or found
+    try {
         const today = new HDate();
         const sedra = new Sedra(today.getFullYear(), false);
         const parshaName = sedra.get(today);
@@ -45,12 +69,25 @@ export async function getCurrentParsha(): Promise<Parsha> {
         console.error("Could not determine current parsha from Hebcal:", e);
     }
     
-    // Fallback to a default if API fails or parsha not found
-    const vayechi = parshiot.find(p => p.slug === 'vayechi');
-    return vayechi || parshiot[11];
+    // Fallback to a default if all else fails
+    return parshiot.find(p => p.slug === 'bereshit') || parshiot[0];
 }
 
-// This function will revalidate paths, but the actual data mutation will happen client-side.
+
+export async function setCurrentParsha(slug: string): Promise<{success: boolean, error?: string}> {
+    try {
+        const firestore = await getFirestoreAdmin();
+        const settingsRef = doc(firestore, 'settings', 'currentParsha');
+        await setDoc(settingsRef, { slug });
+        revalidatePath('/'); // Revalidate home page to show the new parsha
+        return { success: true };
+    } catch (e) {
+        console.error("Failed to set current parsha:", e);
+        return { success: false, error: (e as Error).message };
+    }
+}
+
+
 export async function revalidateInsightPaths(parshaSlug: string) {
   revalidatePath("/");
   revalidatePath(`/parshiot/${parshaSlug}`);

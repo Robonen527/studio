@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset establishes a public, read-only content model with writes restricted to a specific set of administrators. The primary goal is to allow anyone, authenticated or not, to read Torah insights, while ensuring that only trusted admin users can create, modify, or delete content.
  *
@@ -5,6 +6,7 @@
  * - /parshiot/{parshaId}: A top-level collection containing metadata for each Torah portion.
  * - /parshiot/{parshaId}/torahInsights/{insightId}: A subcollection containing the actual Torah insights for a given portion.
  * - /roles_admin/{userId}: A dedicated collection for authorization. The existence of a document here, where the document ID is a user's UID, grants that user admin privileges across the database.
+ * - /settings/currentParsha: A document to manually override the current parsha.
  *
  * Key Security Decisions:
  * - Public Read Access: All content in `/parshiot` and its `torahInsights` subcollections is publicly readable by anyone, including unauthenticated users. This supports the primary use case of content consumption.
@@ -100,6 +102,17 @@ service cloud.firestore {
       allow create: if request.auth.uid == userId; // Allow user to create their own role doc.
       allow update: if false;
       allow delete: if false;
+    }
+
+     /**
+     * @description Rules for the settings collection. This allows admins to change site-wide settings.
+     * @path /settings/{settingId}
+     * @allow (get) Anyone can read settings.
+     * @allow (write) Only admins can change settings.
+     */
+    match /settings/{settingId} {
+        allow get: if true;
+        allow write: if isAdmin();
     }
   }
 }
