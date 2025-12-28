@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "torah-scroll",
+      "description": "An ancient Torah scroll unfurled on a wooden table.",
+      "imageUrl": "https://images.unsplash.com/photo-1522442676585-c751dab71864?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx0b3JhaCUyMHNjcm9sbHxlbnwwfHx8fDE3NjY5MTg3MjV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "torah scroll"
+    }
+  ]
 }
