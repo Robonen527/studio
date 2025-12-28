@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: ParshaDetailPageProps) {
     if (!parsha) {
         return { title: "הפרשה לא נמצאה" };
     }
-    return { title: `פרשת ${parsha.name} | פרשה מאיר-ה` };
+    return { title: `פרשת ${parsha.name} | מאיר בפרשה` };
 }
 
 export default async function ParshaDetailPage({ params }: ParshaDetailPageProps) {

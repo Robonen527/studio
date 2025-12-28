@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lightbulb } from 'lucide-react';
 
 export const metadata = {
-  title: 'כל הפרשות | פרשה מאיר-ה',
+  title: 'כל הפרשות | מאיר בפרשה',
 };
 
 export default async function ParshiotPage() {
