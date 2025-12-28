@@ -22,10 +22,18 @@ type ParshaDetailPageProps = {
 
 export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   const [parsha, setParsha] = useState<Parsha | null>(null);
+  const [slug, setSlug] = useState('');
   const firestore = useFirestore();
-  const { slug } = params;
 
   useEffect(() => {
+    if (params.slug) {
+        setSlug(params.slug);
+    }
+  }, [params]);
+
+
+  useEffect(() => {
+    if (!slug) return;
     async function fetchParsha() {
       const p = await getParshaBySlug(slug);
       if (!p) {
