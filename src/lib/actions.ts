@@ -73,21 +73,6 @@ export async function getCurrentParsha(): Promise<Parsha> {
     return parshiot.find(p => p.slug === 'bereshit') || parshiot[0];
 }
 
-
-export async function setCurrentParsha(slug: string): Promise<{success: boolean, error?: string}> {
-    try {
-        const firestore = await getFirestoreAdmin();
-        const settingsRef = doc(firestore, 'settings', 'currentParsha');
-        await setDoc(settingsRef, { slug });
-        revalidatePath('/'); // Revalidate home page to show the new parsha
-        return { success: true };
-    } catch (e) {
-        console.error("Failed to set current parsha:", e);
-        return { success: false, error: (e as Error).message };
-    }
-}
-
-
 export async function revalidateInsightPaths(parshaSlug: string) {
   revalidatePath("/");
   revalidatePath(`/parshiot/${parshaSlug}`);

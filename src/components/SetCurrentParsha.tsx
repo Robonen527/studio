@@ -19,11 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { parshiot } from "@/lib/parshiot";
-import { setCurrentParsha } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { doc } from "firebase/firestore";
+import { revalidateInsightPaths } from "@/lib/actions";
 
 type SetCurrentParshaProps = {
   currentParshaSlug: string;
@@ -31,6 +32,7 @@ type SetCurrentParshaProps = {
 
 export function SetCurrentParsha({ currentParshaSlug }: SetCurrentParshaProps) {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSlug, setSelectedSlug] = useState(currentParshaSlug);
   const [isPending, startTransition] = useTransition();
@@ -43,16 +45,26 @@ export function SetCurrentParsha({ currentParshaSlug }: SetCurrentParshaProps) {
   }
 
   const handleSave = () => {
-    startTransition(async () => {
-      const result = await setCurrentParsha(selectedSlug);
-      if (result.success) {
-        toast({
-          title: "הצלחה",
-          description: "פרשת השבוע עודכנה בהצלחה.",
+    if (!firestore) return;
+
+    startTransition(() => {
+      try {
+        const settingsRef = doc(firestore, 'settings', 'currentParsha');
+        setDocumentNonBlocking(settingsRef, { slug: selectedSlug }, { merge: false });
+        
+        // Optimistically revalidate and close
+        revalidateInsightPaths(selectedSlug).then(() => {
+            toast({
+              title: "הצלחה",
+              description: "פרשת השבוע עודכנה. השינוי יתעדכן בדף בעוד מספר רגעים.",
+            });
+            setIsOpen(false);
+            // Optional: force a reload if revalidation is not immediate enough
+            window.location.reload();
         });
-        setIsOpen(false);
-      } else {
-        toast({
+
+      } catch (e) {
+         toast({
           variant: "destructive",
           title: "שגיאה",
           description: "אירעה שגיאה בעדכון פרשת השבוע.",
