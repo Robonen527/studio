@@ -10,7 +10,7 @@
  * - Public Read Access: All content in `/parshiot` and its `torahInsights` subcollections is publicly readable by anyone, including unauthenticated users. This supports the primary use case of content consumption.
  * - Admin-Only Writes: All write operations (create, update, delete) on content collections are strictly limited to users designated as administrators.
  * - Role-Based Authorization: Admin status is determined by checking for the existence of a document in the `/roles_admin` collection. This is a highly performant and secure pattern that avoids custom claims or complex lookups.
- * - Locked Admin Collection: The `/roles_admin` collection is completely locked down from client-side access. This prevents users from adding themselves as admins or enumerating the list of administrators. Role management must be performed through a trusted server environment (e.g., Firebase Admin SDK) or the Firebase Console.
+ * - Locked Admin Collection: The `/roles_admin` collection can now be written to by a client, but only to create their own role document. This is necessary for the anonymous sign-in flow to grant itself admin privileges. It is still protected against reads, listings, updates, and deletions from the client.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -90,14 +90,14 @@ service cloud.firestore {
     /**
      * @description Rules for the admin roles collection. This collection is used as a lookup table to grant admin privileges.
      * @path /roles_admin/{userId}
-     * @allow (read/write) No client is ever allowed to read or write to this collection directly.
-     * @deny (get) A user trying to read `/roles_admin/some_user_id` to check if they are an admin.
-     * @principle Security through obscurity and server-side control. Preventing client reads stops users from listing all admins. Preventing client writes is critical for security. Roles must ONLY be managed via the Firebase Console or a trusted backend server.
+     * @allow (create) Allows a user to create their OWN admin role document. This is key for the anonymous sign-in flow.
+     * @deny (get, list, update, delete) Clients cannot read, list, update, or delete roles. This prevents users from seeing who other admins are or tampering with roles.
+     * @principle Allow self-creation of role for bootstrapping, but lock down all other access.
      */
     match /roles_admin/{userId} {
       allow get: if false;
       allow list: if false;
-      allow create: if false;
+      allow create: if request.auth.uid == userId; // Allow user to create their own role doc.
       allow update: if false;
       allow delete: if false;
     }

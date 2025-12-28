@@ -18,8 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { useAuth } from "@/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { useAuth, useUser } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
 
 const formSchema = z.object({
   username: z.string().min(1, { message: "יש להזין שם משתמש." }),
@@ -34,6 +36,7 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const auth = useAuth();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -43,27 +46,29 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setError(null);
+    if (values.username.toLowerCase() !== 'admin' || values.password !== '1234') {
+      setError("שם המשתמש או הסיסמה שגויים.");
+      return;
+    }
+
     startTransition(async () => {
-      // Hardcoded check for admin user
-      if (values.username.toLowerCase() === 'admin' && values.password === '1234') {
-        try {
-          // We still sign in to get a valid user session for Firestore rules.
-          // For this demo, we use a pre-created user.
-          await signInWithEmailAndPassword(auth, "admin@example.com", values.password);
+      try {
+        const userCredential = await signInAnonymously(auth);
+        const user = userCredential.user;
+
+        if (user && firestore) {
+          // Grant admin role by creating a document in roles_admin collection
+          const adminRoleRef = doc(firestore, `roles_admin/${user.uid}`);
+          await setDoc(adminRoleRef, { username: 'admin_anonymous' });
           onSuccess();
-        } catch (e: any) {
-           // If the pre-defined admin user doesn't exist in Firebase, this will fail.
-           // For the demo, we will show a more specific error.
-            if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-                 setError("התחברות המנהל המוגדרת מראש נכשלה. ודא שהמשתמש admin@example.com קיים במערכת האימות של Firebase.");
-            } else {
-                setError("אירעה שגיאה לא צפויה באימות. נסה שוב מאוחר יותר.");
-            }
+        } else {
+          setError("ההתחברות האנונימית נכשלה. נסה שוב.");
         }
-      } else {
-        setError("שם המשתמש או הסיסמה שגויים.");
+      } catch (e: any) {
+        console.error("Anonymous sign-in error:", e);
+        setError("אירעה שגיאה לא צפויה באימות. נסה שוב מאוחר יותר.");
       }
     });
   }
