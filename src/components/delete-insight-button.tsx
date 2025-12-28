@@ -1,7 +1,7 @@
+
 "use client";
 
 import { useState, useTransition } from "react";
-import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Trash2, Loader2 } from "lucide-react";
 import {
@@ -16,7 +16,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { deleteInsight } from "@/lib/actions";
+import { useUser, useFirestore, deleteDocumentNonBlocking } from "@/firebase";
+import { doc } from "firebase/firestore";
+import { revalidateInsightPaths } from "@/lib/actions";
 
 type DeleteInsightButtonProps = {
   parshaSlug: string;
@@ -24,29 +26,35 @@ type DeleteInsightButtonProps = {
 };
 
 export function DeleteInsightButton({ parshaSlug, insightId }: DeleteInsightButtonProps) {
-  const { isAdmin, isLoading: isAuthLoading } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   const handleDelete = () => {
     startTransition(async () => {
-      const result = await deleteInsight(parshaSlug, insightId);
-      if (result.success) {
+      try {
+        const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, insightId);
+        deleteDocumentNonBlocking(docRef);
+        
+        await revalidateInsightPaths(parshaSlug);
+
         toast({
           title: "הצלחה",
-          description: result.message,
+          description: "דבר התורה נמחק בהצלחה.",
         });
-      } else {
-        toast({
+      } catch (error) {
+         toast({
           variant: "destructive",
           title: "שגיאה",
-          description: result.message,
+          description: "אירעה שגיאה במחיקת דבר התורה.",
         });
       }
     });
   };
 
-  if (isAuthLoading || !isAdmin) {
+  const isAdmin = !!user;
+  if (isUserLoading || !isAdmin) {
     return null;
   }
 

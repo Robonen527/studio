@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -16,9 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { addInsight, editInsight } from "@/lib/actions";
 import type { Insight } from "@/lib/types";
 import { Loader2 } from "lucide-react";
+import { useFirestore, addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import { revalidateInsightPaths } from "@/lib/actions";
+
 
 const formSchema = z.object({
   title: z.string().min(2, { message: "הכותרת חייבת להכיל לפחות 2 תווים." }),
@@ -35,6 +39,7 @@ type InsightFormProps = {
 export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,23 +52,43 @@ export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFo
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
-        const result = insightToEdit 
-            ? await editInsight(parshaSlug, insightToEdit.id, values)
-            : await addInsight({ ...values, parshaSlug });
-      
-        if (result.success) {
-            toast({
-                title: "הצלחה!",
-                description: result.message,
-            });
-            onFinished();
+      try {
+        const collectionRef = collection(firestore, `parshiot/${parshaSlug}/torahInsights`);
+        
+        if (insightToEdit) {
+          // Editing existing insight
+          const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, insightToEdit.id);
+          const dataToUpdate = { ...values };
+          setDocumentNonBlocking(docRef, dataToUpdate, { merge: true });
+          toast({
+            title: "הצלחה!",
+            description: "דבר התורה עודכן בהצלחה.",
+          });
         } else {
-            toast({
-                variant: "destructive",
-                title: "שגיאה",
-                description: result.message,
-            });
+          // Adding new insight
+          const dataToAdd = {
+            ...values,
+            parshaSlug,
+            createdAt: new Date().toISOString(),
+          };
+          addDocumentNonBlocking(collectionRef, dataToAdd);
+          toast({
+            title: "הצלחה!",
+            description: "דבר התורה נוסף בהצלחה.",
+          });
         }
+
+        await revalidateInsightPaths(parshaSlug);
+        onFinished();
+        
+      } catch (error) {
+        console.error("Error saving insight:", error);
+        toast({
+          variant: "destructive",
+          title: "שגיאה",
+          description: "אירעה שגיאה בשמירת דבר התורה.",
+        });
+      }
     });
   }
 

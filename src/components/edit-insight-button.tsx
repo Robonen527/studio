@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -12,17 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import { InsightForm } from "./insight-form";
 import type { Insight } from "@/lib/types";
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/firebase";
 
 type EditInsightButtonProps = {
   insight: Insight;
 };
 
 export function EditInsightButton({ insight }: EditInsightButtonProps) {
-  const { isAdmin, isLoading } = useAuth();
+  const { user, isUserLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (isLoading || !isAdmin) {
+  const isAdmin = !!user;
+
+  if (isUserLoading || !isAdmin) {
     return null;
   }
 

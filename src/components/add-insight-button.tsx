@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -11,7 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { InsightForm } from "./insight-form";
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/firebase";
 
 type AddInsightButtonProps = {
   parshaSlug: string;
@@ -19,10 +20,13 @@ type AddInsightButtonProps = {
 };
 
 export function AddInsightButton({ parshaSlug, isPrimary = false }: AddInsightButtonProps) {
-  const { isAdmin, isLoading } = useAuth();
+  const { user, isUserLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
+  
+  // In this app, any logged-in user is an admin
+  const isAdmin = !!user;
 
-  if (isLoading || !isAdmin) {
+  if (isUserLoading || !isAdmin) {
     return null;
   }
 

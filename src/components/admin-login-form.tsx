@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -17,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/firebase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "כתובת אימייל לא חוקית." }),
@@ -31,7 +33,7 @@ type AdminLoginFormProps = {
 export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const auth = getAuth();
+  const auth = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

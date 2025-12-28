@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -11,15 +12,19 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { AdminLoginForm } from './admin-login-form';
-import { useAuth } from '@/context/auth-context';
-import { getAuth, signOut } from 'firebase/auth';
+import { useUser, useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { Skeleton } from './ui/skeleton';
 
 export function AuthButton() {
-  const { isAdmin, isLoading } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  
+  const isAdmin = !!user;
 
-  if (isLoading) {
-    return <Button variant="outline" size="sm" disabled className="w-28"><div className="h-4 w-20 animate-pulse rounded-md bg-muted"></div></Button>
+  if (isUserLoading) {
+    return <Skeleton className="h-9 w-28" />
   }
 
   const handleLoginSuccess = () => {
@@ -27,7 +32,6 @@ export function AuthButton() {
   };
 
   const handleLogout = async () => {
-    const auth = getAuth();
     await signOut(auth);
   }
 

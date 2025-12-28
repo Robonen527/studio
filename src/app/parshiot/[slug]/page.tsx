@@ -1,11 +1,18 @@
-import { getParshaBySlug, getInsightsForParsha, deleteInsight } from "@/lib/actions";
+
+"use client";
+import { useState, useEffect } from 'react';
+import { getParshaBySlug } from "@/lib/actions";
 import { notFound } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
 import { EditInsightButton } from "@/components/edit-insight-button";
 import { DeleteInsightButton } from "@/components/delete-insight-button";
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import type { Insight, Parsha } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type ParshaDetailPageProps = {
   params: {
@@ -13,21 +20,44 @@ type ParshaDetailPageProps = {
   };
 };
 
-export async function generateMetadata({ params }: ParshaDetailPageProps) {
-    const parsha = await getParshaBySlug(params.slug);
-    if (!parsha) {
-        return { title: "הפרשה לא נמצאה" };
+export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
+  const [parsha, setParsha] = useState<Parsha | null>(null);
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    async function fetchParsha() {
+      const p = await getParshaBySlug(params.slug);
+      if (!p) {
+        notFound();
+      }
+      setParsha(p);
+      if(p) {
+        document.title = `פרשת ${p.name} | מאיר בפרשה`;
+      }
     }
-    return { title: `פרשת ${parsha.name} | מאיר בפרשה` };
-}
+    fetchParsha();
+  }, [params.slug]);
 
-export default async function ParshaDetailPage({ params }: ParshaDetailPageProps) {
-  const parsha = await getParshaBySlug(params.slug);
+  const insightsQuery = useMemoFirebase(() => 
+    parsha ? query(
+      collection(firestore, `parshiot/${parsha.slug}/torahInsights`),
+      orderBy("createdAt", "desc")
+    ) : null,
+  [firestore, parsha]);
+
+  const { data: insights, isLoading } = useCollection<Insight>(insightsQuery);
+
   if (!parsha) {
-    notFound();
+    return (
+       <div className="container mx-auto px-4 py-8 md:py-12">
+        <Skeleton className="h-12 w-1/3 mb-8" />
+        <div className="space-y-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    )
   }
-
-  const insights = await getInsightsForParsha(params.slug);
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12">
@@ -41,7 +71,12 @@ export default async function ParshaDetailPage({ params }: ParshaDetailPageProps
         <AddInsightButton parshaSlug={parsha.slug} />
       </div>
 
-      {insights.length > 0 ? (
+      {isLoading ? (
+        <div className="space-y-6">
+          <Card className="shadow-md"><CardHeader><Skeleton className="h-8 w-1/2" /><Skeleton className="h-4 w-1/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+          <Card className="shadow-md"><CardHeader><Skeleton className="h-8 w-1/2" /><Skeleton className="h-4 w-1/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+        </div>
+      ) : insights && insights.length > 0 ? (
         <div className="space-y-6">
           {insights.map((insight) => (
             <Card key={insight.id} className="shadow-md transition-shadow hover:shadow-lg">
