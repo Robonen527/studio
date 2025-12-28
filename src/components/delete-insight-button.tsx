@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { deleteInsight } from "@/lib/actions";
 
 type DeleteInsightButtonProps = {
-  insightId: number;
+  insightId: string;
 };
 
 export function DeleteInsightButton({ insightId }: DeleteInsightButtonProps) {

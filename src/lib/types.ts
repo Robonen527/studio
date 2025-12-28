@@ -4,7 +4,7 @@ export type Parsha = {
 };
 
 export type Insight = {
-  id: number;
+  id: string;
   parshaSlug: string;
   title: string;
   content: string;

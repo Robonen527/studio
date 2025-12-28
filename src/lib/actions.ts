@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { insights } from "./data";
+import { db } from "./firebase";
 import { parshiot } from "./parshiot";
 import type { Insight, Parsha } from "./types";
+import { collection, getDocs, addDoc, doc, getDoc, updateDoc, deleteDoc, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
 
 // Simulate network delay
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -33,23 +34,53 @@ export async function getParshaBySlug(slug: string) {
 }
 
 export async function getInsightsForParsha(parshaSlug: string) {
-  await delay(500);
-  return insights
-    .filter((insight) => insight.parshaSlug === parshaSlug)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const insightsCol = collection(db, "insights");
+    const q = query(insightsCol, where("parshaSlug", "==", parshaSlug), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    const insights = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
+        } as Insight;
+    });
+    return insights;
 }
 
 export async function getLatestInsightForParsha(parshaSlug: string) {
-  await delay(200);
-  const parshaInsights = insights
-    .filter((insight) => insight.parshaSlug === parshaSlug)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return parshaInsights[0] || null;
+    const insightsCol = collection(db, "insights");
+    const q = query(insightsCol, where("parshaSlug", "==", parshaSlug), orderBy("createdAt", "desc"), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+        return null;
+    }
+
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+    return {
+        id: doc.id,
+        ...data,
+        createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
+    } as Insight;
 }
 
-export async function getInsightById(id: number) {
-  await delay(200);
-  return insights.find((insight) => insight.id === id) || null;
+
+export async function getInsightById(id: string) {
+    const docRef = doc(db, "insights", id);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+        return null;
+    }
+
+    const data = docSnap.data();
+    return {
+        id: docSnap.id,
+        ...data,
+        createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
+    } as Insight;
 }
 
 export async function getCurrentParsha() {
@@ -62,43 +93,59 @@ export async function getCurrentParsha() {
 
 
 export async function addInsight(data: Omit<Insight, "id" | "createdAt">) {
-  await delay(1000);
-  const newId = insights.length > 0 ? Math.max(...insights.map(i => i.id)) + 1 : 1;
-  const newInsight: Insight = {
-    ...data,
-    id: newId,
-    createdAt: new Date().toISOString(),
-  };
-  insights.unshift(newInsight);
-  revalidatePath("/");
-  revalidatePath(`/parshiot/${data.parshaSlug}`);
-  return { success: true, message: "דבר התורה נוסף בהצלחה!" };
+  try {
+    const insightsCol = collection(db, "insights");
+    await addDoc(insightsCol, {
+        ...data,
+        createdAt: new Date(),
+    });
+    revalidatePath("/");
+    revalidatePath(`/parshiot/${data.parshaSlug}`);
+    return { success: true, message: "דבר התורה נוסף בהצלחה!" };
+  } catch (e) {
+    console.error("Error adding document: ", e);
+    return { success: false, message: "שגיאה בהוספת דבר התורה." };
+  }
 }
 
-export async function editInsight(id: number, data: Partial<Omit<Insight, "id" | "createdAt" | "parshaSlug">>) {
-    await delay(1000);
-    const index = insights.findIndex(i => i.id === id);
-    if (index === -1) {
-        return { success: false, message: "דבר התורה לא נמצא." };
+export async function editInsight(id: string, data: Partial<Omit<Insight, "id" | "createdAt" | "parshaSlug">>) {
+    try {
+        const docRef = doc(db, "insights", id);
+        await updateDoc(docRef, data);
+        
+        const updatedDoc = await getDoc(docRef);
+        const parshaSlug = updatedDoc.data()?.parshaSlug;
+
+        revalidatePath("/");
+        if (parshaSlug) {
+            revalidatePath(`/parshiot/${parshaSlug}`);
+        }
+        return { success: true, message: "דבר התורה עודכן בהצלחה!" };
+    } catch (e) {
+        console.error("Error updating document: ", e);
+        return { success: false, message: "שגיאה בעדכון דבר התורה." };
     }
-    const originalInsight = insights[index];
-    insights[index] = { ...originalInsight, ...data };
-    
-    revalidatePath("/");
-    revalidatePath(`/parshiot/${originalInsight.parshaSlug}`);
-    return { success: true, message: "דבר התורה עודכן בהצלחה!" };
 }
 
-export async function deleteInsight(id: number) {
-    await delay(1000);
-    const index = insights.findIndex(i => i.id === id);
-    if (index === -1) {
-        return { success: false, message: "דבר התורה לא נמצא." };
-    }
-    const parshaSlug = insights[index].parshaSlug;
-    insights.splice(index, 1);
+export async function deleteInsight(id: string) {
+    try {
+        const docRef = doc(db, "insights", id);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+             return { success: false, message: "דבר התורה לא נמצא." };
+        }
 
-    revalidatePath("/");
-    revalidatePath(`/parshiot/${parshaSlug}`);
-    return { success: true, message: "דבר התורה נמחק בהצלחה!" };
+        const parshaSlug = docSnap.data().parshaSlug;
+        await deleteDoc(docRef);
+
+        revalidatePath("/");
+        if (parshaSlug) {
+            revalidatePath(`/parshiot/${parshaSlug}`);
+        }
+        return { success: true, message: "דבר התורה נמחק בהצלחה!" };
+    } catch(e) {
+        console.error("Error deleting document: ", e);
+        return { success: false, message: "שגיאה במחיקת דבר התורה." };
+    }
 }
