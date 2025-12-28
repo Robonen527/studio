@@ -6,12 +6,8 @@ import { parshiot } from "./parshiot";
 import type { Parsha } from "./types";
 import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
-import { doc, getDoc } from "firebase/firestore";
-
-async function getFirestoreAdmin() {
-    const { firestore } = await initializeAdminApp();
-    return firestore;
-}
+import { getDoc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 
 
 export async function getParshiot() {
@@ -36,7 +32,7 @@ export async function getParshaBySlug(slug: string) {
 
 export async function getCurrentParsha(): Promise<Parsha> {
     try {
-        const firestore = await getFirestoreAdmin();
+        const { firestore } = await initializeAdminApp();
         const settingsRef = doc(firestore, 'settings', 'currentParsha');
         const settingsDoc = await getDoc(settingsRef);
 

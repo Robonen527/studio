@@ -38,6 +38,11 @@ export async function initializeAdminApp(): Promise<AdminFirebaseServices> {
       auth: getAuth(existingApp),
     };
   }
+  
+  if (!serviceAccount) {
+    throw new Error("Service account key is not available. Cannot initialize Firebase Admin SDK.");
+  }
+
 
   // Initialize the admin app if it doesn't exist
   const adminApp = initializeApp({
