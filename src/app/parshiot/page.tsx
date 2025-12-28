@@ -1,7 +1,7 @@
 import { getParshiotWithChumash } from '@/lib/actions';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { TorahIcon } from '@/components/torah-icon';
+import { Lightbulb } from 'lucide-react';
 
 export const metadata = {
   title: 'כל הפרשות | פרשה מאיר-ה',
@@ -27,7 +27,7 @@ export default async function ParshiotPage() {
                   <Card className="h-full transition-all duration-300 ease-in-out group-hover:shadow-lg group-hover:border-accent group-hover:-translate-y-1">
                     <CardHeader className="flex-row items-center gap-4 space-y-0">
                       <div className="bg-primary/10 p-2 rounded-lg">
-                          <TorahIcon className="h-6 w-6 text-primary" />
+                          <Lightbulb className="h-6 w-6 text-primary" />
                       </div>
                       <CardTitle className="font-headline text-xl text-card-foreground group-hover:text-primary">
                         {parsha.name}
