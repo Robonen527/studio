@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getCurrentParsha } from "@/lib/actions";
+import { getCurrentParsha as getParshaByDate, getParshaBySlug } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -34,14 +34,36 @@ function CurrentParshaDebug() {
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
   const firestore = useFirestore();
+  
+  // 1. Fetch the manually set parsha from Firestore (like the debug component)
+  const settingsDocRef = useMemoFirebase(() => doc(firestore, 'settings/currentParsha'), [firestore]);
+  const { data: manualParshaSetting, isLoading: isLoadingManualParsha } = useDoc<{ slug: string }>(settingsDocRef);
 
+  // 2. Fetch the date-based parsha as a fallback
+  const [dateBasedParsha, setDateBasedParsha] = useState<Parsha | null>(null);
   useEffect(() => {
-    async function fetchCurrentParsha() {
-      const parsha = await getCurrentParsha();
-      setCurrentParsha(parsha);
+    async function fetchParshaByDate() {
+      const parsha = await getParshaByDate();
+      setDateBasedParsha(parsha);
     }
-    fetchCurrentParsha();
+    fetchParshaByDate();
   }, []);
+
+  // 3. Determine the definitive current parsha
+  useEffect(() => {
+    async function determineParsha() {
+      if (isLoadingManualParsha) return; // Wait until we know if there's a manual setting
+
+      if (manualParshaSetting?.slug) {
+        const parsha = await getParshaBySlug(manualParshaSetting.slug);
+        setCurrentParsha(parsha);
+      } else {
+        setCurrentParsha(dateBasedParsha);
+      }
+    }
+    determineParsha();
+  }, [manualParshaSetting, dateBasedParsha, isLoadingManualParsha]);
+
 
   const insightsQuery = useMemoFirebase(() => 
     currentParsha ? query(
@@ -52,10 +74,12 @@ export default function Home() {
     [firestore, currentParsha]
   );
 
-  const { data: insights, isLoading } = useCollection<Insight>(insightsQuery);
+  const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   const latestInsight = insights?.[0];
 
-  if (!currentParsha) {
+  const isLoading = !currentParsha;
+
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="flex flex-col items-center text-center mb-12">
@@ -89,7 +113,7 @@ export default function Home() {
             <AddInsightButton parshaSlug={currentParsha.slug} />
           </CardTitle>
           <CardDescription>
-            {isLoading ? <Skeleton className="h-5 w-48" /> : (
+            {isLoadingInsights ? <Skeleton className="h-5 w-48" /> : (
               latestInsight 
                 ? `מאת ${latestInsight.author} | ${new Date(latestInsight.createdAt).toLocaleDateString('he-IL')}` 
                 : `פרשת ${currentParsha.name}`
@@ -97,7 +121,7 @@ export default function Home() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoadingInsights ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-24 w-full" />

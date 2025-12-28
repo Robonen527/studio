@@ -30,6 +30,8 @@ export async function getParshaBySlug(slug: string) {
 }
 
 export async function getCurrentParsha(): Promise<Parsha> {
+    // This function will now primarily be for date-based calculation,
+    // as the manual override is handled client-side on the homepage.
     try {
         const { firestore } = await initializeAdminApp();
         const settingsRef = doc(firestore, 'settings', 'currentParsha');
@@ -43,7 +45,7 @@ export async function getCurrentParsha(): Promise<Parsha> {
             }
         }
     } catch (e) {
-        console.error("Could not fetch manual parsha override:", e);
+        console.error("Could not fetch manual parsha override from server:", e);
     }
     
     // Fallback to Hebcal if no manual override is set or found
@@ -73,4 +75,3 @@ export async function revalidateInsightPaths(parshaSlug: string) {
   revalidatePath(`/parshiot/${parshaSlug}`);
   revalidatePath("/parshiot");
 }
-
