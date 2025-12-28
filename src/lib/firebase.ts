@@ -1,4 +1,6 @@
-
+// Firebase integration is temporarily disabled to prevent build errors.
+// To re-enable, configure your Firebase project and uncomment the code below.
+/*
 import admin from 'firebase-admin';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
@@ -31,3 +33,5 @@ if (!admin.apps.length) {
 }
 
 export { db };
+*/
+export {};

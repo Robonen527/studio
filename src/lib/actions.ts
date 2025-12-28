@@ -1,13 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "./firebase";
 import { parshiot } from "./parshiot";
 import type { Insight, Parsha } from "./types";
-import { collection, getDocs, addDoc, doc, getDoc, updateDoc, deleteDoc, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
 
 // Simulate network delay
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+// In-memory store for insights
+let insightsStore: Insight[] = [
+    {
+        id: "1",
+        parshaSlug: "vayechi",
+        title: "ברכת יעקב לבניו",
+        author: "הרב יונתן זקס",
+        content: "פרשת ויחי מסיימת את ספר בראשית ואת סיפור חייהם של האבות. יעקב, על ערש דווי, אוסף את בניו כדי לברך אותם. ברכותיו אינן רק איחולים לעתיד, אלא גם נבואות ותוכחות המעצבות את זהותם של שבטי ישראל. כל ברכה מותאמת לאופיו ולמעשיו של כל בן, ומכאן אנו למדים על חשיבות ההכרה בייחודיותו של כל אדם ועל האחריות הנלווית לכך.",
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+        id: "2",
+        parshaSlug: "bereshit",
+        title: "בריאת העולם והאור הראשון",
+        author: "הרב קוק",
+        content: "בראשית ברא אלוהים את השמים ואת הארץ. הפסוק הפותח את התורה הוא גם המסד לכל האמונה. מעשה הבריאה מלמד אותנו על כוחו האינסופי של הבורא ועל הסדר המופתי שהטביע בעולם. האור הראשון שנברא לא היה אור פיזי, אלא אור רוחני עליון, 'אור הגנוז', שממנו יכולים צדיקים ליהנות. תפקידנו בעולם הוא לחשוף את אותו אור גנוז במעשינו.",
+        createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+];
 
 export async function getParshiot() {
   await delay(500);
@@ -34,87 +52,54 @@ export async function getParshaBySlug(slug: string) {
 }
 
 export async function getInsightsForParsha(parshaSlug: string) {
-    const insightsCol = collection(db, "insights");
-    const q = query(insightsCol, where("parshaSlug", "==", parshaSlug), orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    const insights = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
-        } as Insight;
-    });
-    return insights;
+    await delay(300);
+    const filteredInsights = insightsStore.filter(i => i.parshaSlug === parshaSlug);
+    return filteredInsights.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function getLatestInsightForParsha(parshaSlug: string) {
-    const insightsCol = collection(db, "insights");
-    const q = query(insightsCol, where("parshaSlug", "==", parshaSlug), orderBy("createdAt", "desc"), limit(1));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-        return null;
-    }
-
-    const doc = snapshot.docs[0];
-    const data = doc.data();
-    return {
-        id: doc.id,
-        ...data,
-        createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
-    } as Insight;
+    await delay(300);
+    const insights = await getInsightsForParsha(parshaSlug);
+    return insights[0] || null;
 }
 
-
 export async function getInsightById(id: string) {
-    const docRef = doc(db, "insights", id);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-        return null;
-    }
-
-    const data = docSnap.data();
-    return {
-        id: docSnap.id,
-        ...data,
-        createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
-    } as Insight;
+    await delay(200);
+    return insightsStore.find(i => i.id === id) || null;
 }
 
 export async function getCurrentParsha() {
-    // This is a simplified mock. A real implementation would use a library like hebcal
-    // to determine the current parsha based on the Hebrew date. For now, it's Vayechi.
     await delay(100);
     const vayechi = parshiot.find(p => p.slug === 'vayechi');
-    return vayechi || parshiot[11]; // Fallback to index if slug is wrong
+    return vayechi || parshiot[11];
 }
-
 
 export async function addInsight(data: Omit<Insight, "id" | "createdAt">) {
   try {
-    const insightsCol = collection(db, "insights");
-    await addDoc(insightsCol, {
+    const newInsight: Insight = {
         ...data,
-        createdAt: new Date(),
-    });
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+    };
+    insightsStore.unshift(newInsight); // Add to the beginning of the array
     revalidatePath("/");
     revalidatePath(`/parshiot/${data.parshaSlug}`);
     return { success: true, message: "דבר התורה נוסף בהצלחה!" };
   } catch (e) {
-    console.error("Error adding document: ", e);
+    console.error("Error adding insight: ", e);
     return { success: false, message: "שגיאה בהוספת דבר התורה." };
   }
 }
 
 export async function editInsight(id: string, data: Partial<Omit<Insight, "id" | "createdAt" | "parshaSlug">>) {
     try {
-        const docRef = doc(db, "insights", id);
-        await updateDoc(docRef, data);
+        const insightIndex = insightsStore.findIndex(i => i.id === id);
+        if (insightIndex === -1) {
+            return { success: false, message: "דבר התורה לא נמצא." };
+        }
         
-        const updatedDoc = await getDoc(docRef);
-        const parshaSlug = updatedDoc.data()?.parshaSlug;
+        const parshaSlug = insightsStore[insightIndex].parshaSlug;
+        insightsStore[insightIndex] = { ...insightsStore[insightIndex], ...data };
 
         revalidatePath("/");
         if (parshaSlug) {
@@ -122,22 +107,20 @@ export async function editInsight(id: string, data: Partial<Omit<Insight, "id" |
         }
         return { success: true, message: "דבר התורה עודכן בהצלחה!" };
     } catch (e) {
-        console.error("Error updating document: ", e);
+        console.error("Error updating insight: ", e);
         return { success: false, message: "שגיאה בעדכון דבר התורה." };
     }
 }
 
 export async function deleteInsight(id: string) {
     try {
-        const docRef = doc(db, "insights", id);
-        const docSnap = await getDoc(docRef);
-        
-        if (!docSnap.exists()) {
-             return { success: false, message: "דבר התורה לא נמצא." };
+        const insightIndex = insightsStore.findIndex(i => i.id === id);
+        if (insightIndex === -1) {
+            return { success: false, message: "דבר התורה לא נמצא." };
         }
 
-        const parshaSlug = docSnap.data().parshaSlug;
-        await deleteDoc(docRef);
+        const parshaSlug = insightsStore[insightIndex].parshaSlug;
+        insightsStore.splice(insightIndex, 1);
 
         revalidatePath("/");
         if (parshaSlug) {
@@ -145,7 +128,7 @@ export async function deleteInsight(id: string) {
         }
         return { success: true, message: "דבר התורה נמחק בהצלחה!" };
     } catch(e) {
-        console.error("Error deleting document: ", e);
+        console.error("Error deleting insight: ", e);
         return { success: false, message: "שגיאה במחיקת דבר התורה." };
     }
 }
