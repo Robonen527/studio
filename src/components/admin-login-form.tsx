@@ -22,7 +22,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useAuth } from "@/firebase";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "כתובת אימייל לא חוקית." }),
+  username: z.string().min(1, { message: "יש להזין שם משתמש." }),
   password: z.string().min(4, { message: "הסיסמה חייבת להכיל לפחות 4 תווים." }),
 });
 
@@ -38,7 +38,7 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
@@ -47,13 +47,11 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
     setError(null);
     startTransition(async () => {
       // Hardcoded check for admin user
-      if (values.email.toLowerCase() === 'admin@example.com' && values.password === '1234') {
+      if (values.username.toLowerCase() === 'admin' && values.password === '1234') {
         try {
           // We still sign in to get a valid user session for Firestore rules.
-          // In a real app, this user should exist in Firebase Auth.
-          // For this demo, we can use a dummy/anonymous login or a pre-created user.
-          // Let's attempt to sign in, but the primary validation is the hardcoded check.
-          await signInWithEmailAndPassword(auth, values.email, values.password);
+          // For this demo, we use a pre-created user.
+          await signInWithEmailAndPassword(auth, "admin@example.com", values.password);
           onSuccess();
         } catch (e: any) {
            // If the pre-defined admin user doesn't exist in Firebase, this will fail.
@@ -82,12 +80,12 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
         )}
         <FormField
           control={form.control}
-          name="email"
+          name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>אימייל</FormLabel>
+              <FormLabel>שם משתמש</FormLabel>
               <FormControl>
-                <Input placeholder="admin@example.com" {...field} />
+                <Input placeholder="admin" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
