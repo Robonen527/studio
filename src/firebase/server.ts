@@ -5,18 +5,21 @@ import { getApp, getApps, initializeApp, cert, type App } from 'firebase-admin/a
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { firebaseConfig } from './config';
+import path from 'path';
+import fs from 'fs';
 
 // IMPORTANT: Download your service account key JSON file from the Firebase console
 // and place it in the root of your project directory.
 // DO NOT commit this file to version control.
 let serviceAccount: any;
 try {
-  // This is a dynamic import, which is why we use require.
-  // It's not a standard ES module import.
-  // The path is relative to the root of the project where `next` is run.
-  serviceAccount = require('../serviceAccountKey.json');
+  // Construct an absolute path to the service account key file.
+  // process.cwd() gives the root directory where the Next.js process was started.
+  const serviceAccountPath = path.join(process.cwd(), 'src', 'serviceAccountKey.json');
+  const serviceAccountFile = fs.readFileSync(serviceAccountPath, 'utf8');
+  serviceAccount = JSON.parse(serviceAccountFile);
 } catch (e) {
-  console.log('Could not find service account key. Server-side Firebase features may not work.');
+  console.log('Could not find or parse service account key. Server-side Firebase features may not work.', e);
   // We can proceed without it for client-side only apps.
 }
 
