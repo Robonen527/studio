@@ -6,7 +6,7 @@ import { Lightbulb } from 'lucide-react';
 export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-auto min-h-14 flex-wrap items-center justify-between py-2 max-w-screen-2xl gap-y-2">
+      <div className="container flex h-auto min-h-14 flex-wrap items-center justify-between py-2 max-w-screen-2xl gap-y-2 gap-x-4">
         
         {/* Logo and Site Title */}
         <div className="flex items-center gap-4">
@@ -18,13 +18,14 @@ export function Header() {
             </Link>
         </div>
 
-        {/* Date and Parsha display */}
-        <div className="md:mr-0 md:ml-auto">
+        {/* Date and Parsha display - Centered */}
+        {/* flex-1 allows this to take up space and center its content */}
+        <div className="flex-1 flex justify-center order-last md:order-none w-full md:w-auto pt-2 md:pt-0">
             <DateDisplay />
         </div>
-
-        {/* Auth Button */}
-        <div className="w-full md:w-auto flex-1 md:flex-none flex justify-center md:justify-start">
+        
+        {/* Auth Button - pushed to the end */}
+        <div className="flex items-center">
             <AuthButton />
         </div>
       </div>
