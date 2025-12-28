@@ -29,7 +29,7 @@ export default async function ParshiotPage() {
                       <div className="bg-primary/10 p-2 rounded-lg">
                           <TorahIcon className="h-6 w-6 text-primary" />
                       </div>
-                      <CardTitle className="font-headline text-xl text-primary-foreground group-hover:text-primary">
+                      <CardTitle className="font-headline text-xl text-card-foreground group-hover:text-primary">
                         {parsha.name}
                       </CardTitle>
                     </CardHeader>
