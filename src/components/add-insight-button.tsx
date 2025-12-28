@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import {
@@ -12,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { InsightForm } from "./insight-form";
+import { useAuth } from "@/context/auth-context";
 
 type AddInsightButtonProps = {
   parshaSlug: string;

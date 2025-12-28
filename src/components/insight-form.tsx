@@ -48,7 +48,7 @@ export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFo
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
         const result = insightToEdit 
-            ? await editInsight(insightToEdit.id, values)
+            ? await editInsight(parshaSlug, insightToEdit.id, values)
             : await addInsight({ ...values, parshaSlug });
       
         if (result.success) {

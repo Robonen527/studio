@@ -3,19 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { parshiot } from "./parshiot";
 import type { Insight, Parsha } from "./types";
-import { insightsStore } from "./data";
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, query, orderBy, limit } from "firebase/firestore";
+import { getFirestoreInstance } from "@/firebase/server";
+import { HDate, Sedra } from 'hebcal';
 
-// Simulate network delay
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const firestore = getFirestoreInstance();
 
 export async function getParshiot() {
-  await delay(500);
   return parshiot;
 }
 
 export async function getParshiotWithChumash() {
-  await delay(500);
-
   const chumashim: { name: string; parshiot: Parsha[] }[] = [
     { name: 'בראשית', parshiot: parshiot.slice(0, 12) },
     { name: 'שמות', parshiot: parshiot.slice(12, 23) },
@@ -28,29 +26,71 @@ export async function getParshiotWithChumash() {
 }
 
 export async function getParshaBySlug(slug: string) {
-  await delay(200);
   return parshiot.find((p) => p.slug === slug) || null;
 }
 
-export async function getInsightsForParsha(parshaSlug: string) {
-    await delay(300);
-    const filteredInsights = insightsStore.filter(i => i.parshaSlug === parshaSlug);
-    return filteredInsights.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export async function getInsightsForParsha(parshaSlug: string): Promise<Insight[]> {
+  try {
+    const insightsCollection = collection(firestore, `parshiot/${parshaSlug}/torahInsights`);
+    const q = query(insightsCollection, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, parshaSlug, ...doc.data() } as Insight));
+  } catch (e) {
+    console.error(`Error fetching insights for ${parshaSlug}: `, e);
+    return [];
+  }
 }
 
-export async function getLatestInsightForParsha(parshaSlug: string) {
-    await delay(300);
-    const insights = await getInsightsForParsha(parshaSlug);
-    return insights[0] || null;
+export async function getLatestInsightForParsha(parshaSlug: string): Promise<Insight | null> {
+    try {
+        const insightsCollection = collection(firestore, `parshiot/${parshaSlug}/torahInsights`);
+        const q = query(insightsCollection, orderBy("createdAt", "desc"), limit(1));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            return null;
+        }
+
+        const doc = snapshot.docs[0];
+        return { id: doc.id, parshaSlug, ...doc.data() } as Insight;
+    } catch (e) {
+        console.error(`Error fetching latest insight for ${parshaSlug}: `, e);
+        return null;
+    }
 }
 
-export async function getInsightById(id: string) {
-    await delay(200);
-    return insightsStore.find(i => i.id === id) || null;
+export async function getInsightById(parshaSlug: string, id: string): Promise<Insight | null> {
+    try {
+        const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return { id: docSnap.id, parshaSlug, ...docSnap.data() } as Insight;
+        }
+        return null;
+    } catch (e) {
+        console.error(`Error fetching insight ${id} for ${parshaSlug}: `, e);
+        return null;
+    }
 }
 
 export async function getCurrentParsha(): Promise<Parsha> {
-    await delay(100);
+    try {
+        const today = new HDate();
+        const sedra = new Sedra(today.getFullYear(), false);
+        const parshaName = sedra.get(today);
+
+        if (parshaName) {
+             // Hebcal returns an array for combined parshiot
+            const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
+            const parshaInfo = parshiot.find(p => p.name === parshaKey);
+            if (parshaInfo) {
+                return parshaInfo;
+            }
+        }
+    } catch (e) {
+        console.error("Could not determine current parsha from Hebcal:", e);
+    }
+    
     // Fallback to a default if API fails or parsha not found
     const vayechi = parshiot.find(p => p.slug === 'vayechi');
     return vayechi || parshiot[11];
@@ -58,59 +98,52 @@ export async function getCurrentParsha(): Promise<Parsha> {
 
 export async function addInsight(data: Omit<Insight, "id" | "createdAt">) {
   try {
-    const newInsight: Insight = {
-        ...data,
-        id: Date.now().toString(),
+    const insightsCollection = collection(firestore, `parshiot/${data.parshaSlug}/torahInsights`);
+    await addDoc(insightsCollection, {
+        title: data.title,
+        author: data.author,
+        content: data.content,
         createdAt: new Date().toISOString(),
-    };
-    insightsStore.unshift(newInsight); // Add to the beginning of the array
+    });
+    
     revalidatePath("/");
     revalidatePath(`/parshiot/${data.parshaSlug}`);
     return { success: true, message: "דבר התורה נוסף בהצלחה!" };
   } catch (e) {
     console.error("Error adding insight: ", e);
-    return { success: false, message: "שגיאה בהוספת דבר התורה." };
+    const errorMessage = e instanceof Error ? e.message : "שגיאה לא ידועה";
+    return { success: false, message: `שגיאה בהוספת דבר התורה: ${errorMessage}` };
   }
 }
 
-export async function editInsight(id: string, data: Partial<Omit<Insight, "id" | "createdAt" | "parshaSlug">>) {
+export async function editInsight(parshaSlug: string, id: string, data: Partial<Omit<Insight, "id" | "createdAt" | "parshaSlug">>) {
     try {
-        const insightIndex = insightsStore.findIndex(i => i.id === id);
-        if (insightIndex === -1) {
-            return { success: false, message: "דבר התורה לא נמצא." };
-        }
-        
-        const parshaSlug = insightsStore[insightIndex].parshaSlug;
-        insightsStore[insightIndex] = { ...insightsStore[insightIndex], ...data };
+        const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, id);
+        await updateDoc(docRef, data);
 
         revalidatePath("/");
-        if (parshaSlug) {
-            revalidatePath(`/parshiot/${parshaSlug}`);
-        }
+        revalidatePath(`/parshiot/${parshaSlug}`);
+        
         return { success: true, message: "דבר התורה עודכן בהצלחה!" };
     } catch (e) {
         console.error("Error updating insight: ", e);
-        return { success: false, message: "שגיאה בעדכון דבר התורה." };
+        const errorMessage = e instanceof Error ? e.message : "שגיאה לא ידועה";
+        return { success: false, message: `שגיאה בעדכון דבר התורה: ${errorMessage}` };
     }
 }
 
-export async function deleteInsight(id: string) {
+export async function deleteInsight(parshaSlug: string, id: string) {
     try {
-        const insightIndex = insightsStore.findIndex(i => i.id === id);
-        if (insightIndex === -1) {
-            return { success: false, message: "דבר התורה לא נמצא." };
-        }
-
-        const parshaSlug = insightsStore[insightIndex].parshaSlug;
-        insightsStore.splice(insightIndex, 1);
+        const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, id);
+        await deleteDoc(docRef);
 
         revalidatePath("/");
-        if (parshaSlug) {
-            revalidatePath(`/parshiot/${parshaSlug}`);
-        }
+        revalidatePath(`/parshiot/${parshaSlug}`);
+
         return { success: true, message: "דבר התורה נמחק בהצלחה!" };
     } catch(e) {
         console.error("Error deleting insight: ", e);
-        return { success: false, message: "שגיאה במחיקת דבר התורה." };
+        const errorMessage = e instanceof Error ? e.message : "שגיאה לא ידועה";
+        return { success: false, message: `שגיאה במחיקת דבר התורה: ${errorMessage}` };
     }
 }

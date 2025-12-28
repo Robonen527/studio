@@ -17,10 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const formSchema = z.object({
-  username: z.string().min(1, { message: "שם המשתמש הוא שדה חובה." }),
-  password: z.string().min(1, { message: "הסיסמה היא שדה חובה." }),
+  email: z.string().email({ message: "כתובת אימייל לא חוקית." }),
+  password: z.string().min(6, { message: "הסיסמה חייבת להכיל לפחות 6 תווים." }),
 });
 
 type AdminLoginFormProps = {
@@ -30,22 +31,33 @@ type AdminLoginFormProps = {
 export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const auth = getAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     setError(null);
-    startTransition(() => {
-      if (values.username === 'admin' && values.password === 'admin') {
+    startTransition(async () => {
+      try {
+        await signInWithEmailAndPassword(auth, values.email, values.password);
         onSuccess();
-      } else {
-        setError("שם המשתמש או הסיסמה שגויים.");
+      } catch (e: any) {
+        switch (e.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+            setError("שם המשתמש או הסיסמה שגויים.");
+            break;
+          default:
+            setError("אירעה שגיאה לא צפויה. נסה שוב מאוחר יותר.");
+            break;
+        }
       }
     });
   }
@@ -62,12 +74,12 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
         )}
         <FormField
           control={form.control}
-          name="username"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>שם משתמש</FormLabel>
+              <FormLabel>אימייל</FormLabel>
               <FormControl>
-                <Input placeholder="הכנס שם משתמש" {...field} />
+                <Input placeholder="admin@example.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

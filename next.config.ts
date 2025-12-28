@@ -30,6 +30,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    // Required for hebcal to work
+    config.externals.push({
+      './hebcal-iife': 'var null',
+    });
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
 import {
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { InsightForm } from "./insight-form";
 import type { Insight } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
 
 type EditInsightButtonProps = {
   insight: Insight;

@@ -1,43 +1,44 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
+
+// Initialize Firebase app (if not already initialized)
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const auth = getAuth(app);
 
 interface AuthContextType {
+  user: User | null;
   isAdmin: boolean;
-  toggleAdmin: () => void;
   isLoading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAdmin: false,
+  isLoading: true,
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const storedIsAdmin = localStorage.getItem('isAdmin') === 'true';
-      setIsAdmin(storedIsAdmin);
-    } catch (error) {
-      console.error("Could not access localStorage.", error);
-    } finally {
-        setIsLoading(false);
-    }
-  }, []);
-
-  const toggleAdmin = useCallback(() => {
-    setIsAdmin(prev => {
-      const newState = !prev;
-      try {
-        localStorage.setItem('isAdmin', String(newState));
-      } catch (error) {
-        console.error("Could not access localStorage.", error);
-      }
-      return newState;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setIsLoading(false);
     });
-  }, []);
 
-  const value = { isAdmin, toggleAdmin, isLoading };
+    return () => unsubscribe();
+  }, []);
+  
+  // For this app, any logged-in user is considered an admin.
+  // This logic can be expanded later with custom claims if needed.
+  const isAdmin = !!user;
+
+  const value = { user, isAdmin, isLoading };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

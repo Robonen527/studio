@@ -19,17 +19,18 @@ import { useToast } from "@/hooks/use-toast";
 import { deleteInsight } from "@/lib/actions";
 
 type DeleteInsightButtonProps = {
+  parshaSlug: string;
   insightId: string;
 };
 
-export function DeleteInsightButton({ insightId }: DeleteInsightButtonProps) {
+export function DeleteInsightButton({ parshaSlug, insightId }: DeleteInsightButtonProps) {
   const { isAdmin, isLoading: isAuthLoading } = useAuth();
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   const handleDelete = () => {
     startTransition(async () => {
-      const result = await deleteInsight(insightId);
+      const result = await deleteInsight(parshaSlug, insightId);
       if (result.success) {
         toast({
           title: "הצלחה",

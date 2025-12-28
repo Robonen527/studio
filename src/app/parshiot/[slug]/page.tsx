@@ -53,7 +53,7 @@ export default async function ParshaDetailPage({ params }: ParshaDetailPageProps
                     </div>
                     <div className="flex gap-2">
                         <EditInsightButton insight={insight} />
-                        <DeleteInsightButton insightId={insight.id} />
+                        <DeleteInsightButton parshaSlug={parsha.slug} insightId={insight.id} />
                     </div>
                 </div>
               </CardHeader>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { LogIn, LogOut } from 'lucide-react';
 import {
@@ -12,9 +11,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { AdminLoginForm } from './admin-login-form';
+import { useAuth } from '@/context/auth-context';
+import { getAuth, signOut } from 'firebase/auth';
 
 export function AuthButton() {
-  const { isAdmin, toggleAdmin, isLoading } = useAuth();
+  const { isAdmin, isLoading } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   if (isLoading) {
@@ -22,13 +23,17 @@ export function AuthButton() {
   }
 
   const handleLoginSuccess = () => {
-    toggleAdmin();
     setIsLoginOpen(false);
   };
 
+  const handleLogout = async () => {
+    const auth = getAuth();
+    await signOut(auth);
+  }
+
   const handleButtonClick = () => {
     if (isAdmin) {
-      toggleAdmin();
+      handleLogout();
     } else {
       setIsLoginOpen(true);
     }
