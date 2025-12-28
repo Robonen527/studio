@@ -22,7 +22,7 @@ export default async function Home() {
             <AddInsightButton parshaSlug={currentParsha.slug} />
           </CardTitle>
           <CardDescription>
-            {latestInsight ? `מאת ${latestInsight.author} | ${new Date(latestInsight.createdAt).toLocaleDateString('he-IL')}` : "עדיין לא נוספו דברי תורה לפרשה זו"}
+            {latestInsight ? `מאת ${latestInsight.author} | ${new Date(latestInsight.createdAt).toLocaleDateString('he-IL')}` : `פרשת ${currentParsha.name}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -38,7 +38,7 @@ export default async function Home() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">שתף את דבר התורה הראשון לפרשה זו!</p>
+              <p className="text-muted-foreground">עדיין לא נוספו דברי תורה לפרשה זו. שתף את דבר התורה הראשון!</p>
             </div>
           )}
         </CardContent>

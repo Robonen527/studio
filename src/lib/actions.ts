@@ -54,9 +54,10 @@ export async function getInsightById(id: number) {
 
 export async function getCurrentParsha() {
     // This is a simplified mock. A real implementation would use a library like hebcal
-    // to determine the current parsha based on the Hebrew date.
+    // to determine the current parsha based on the Hebrew date. For now, it's Vayechi.
     await delay(100);
-    return parshiot[0]; // Returning 'Bereshit' as the current parsha
+    const vayechi = parshiot.find(p => p.slug === 'vayechi');
+    return vayechi || parshiot[11]; // Fallback to index if slug is wrong
 }
 
 
