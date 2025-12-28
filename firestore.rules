@@ -1,0 +1,105 @@
+/**
+ * Core Philosophy: This ruleset establishes a public, read-only content model with writes restricted to a specific set of administrators. The primary goal is to allow anyone, authenticated or not, to read Torah insights, while ensuring that only trusted admin users can create, modify, or delete content.
+ *
+ * Data Structure:
+ * - /parshiot/{parshaId}: A top-level collection containing metadata for each Torah portion.
+ * - /parshiot/{parshaId}/torahInsights/{insightId}: A subcollection containing the actual Torah insights for a given portion.
+ * - /roles_admin/{userId}: A dedicated collection for authorization. The existence of a document here, where the document ID is a user's UID, grants that user admin privileges across the database.
+ *
+ * Key Security Decisions:
+ * - Public Read Access: All content in `/parshiot` and its `torahInsights` subcollections is publicly readable by anyone, including unauthenticated users. This supports the primary use case of content consumption.
+ * - Admin-Only Writes: All write operations (create, update, delete) on content collections are strictly limited to users designated as administrators.
+ * - Role-Based Authorization: Admin status is determined by checking for the existence of a document in the `/roles_admin` collection. This is a highly performant and secure pattern that avoids custom claims or complex lookups.
+ * - Locked Admin Collection: The `/roles_admin` collection is completely locked down from client-side access. This prevents users from adding themselves as admins or enumerating the list of administrators. Role management must be performed through a trusted server environment (e.g., Firebase Admin SDK) or the Firebase Console.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for authentication and authorization logic.
+    // These functions centralize common checks, making the rules more readable and maintainable.
+
+    /**
+     * Checks if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user has admin privileges.
+     * Admin status is granted if a document with the user's UID exists in the /roles_admin collection.
+     * This is a fast and secure way to manage roles.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * A robust check for update and delete operations, ensuring the user is an admin AND the document already exists.
+     * This prevents unauthorized writes on non-existent paths.
+     */
+    function isExistingDocAdmin() {
+      return isAdmin() && resource != null;
+    }
+
+    /**
+     * Validates that the parshaId in a new TorahInsight document's data matches the parshaId from the URL path.
+     * This enforces relational integrity at the point of creation.
+     */
+    function hasValidTorahInsightDataOnCreate(parshaId) {
+      return request.resource.data.parshaId == parshaId;
+    }
+
+    /**
+     * Enforces that the parshaId field within a TorahInsight document is immutable and cannot be changed after creation.
+     * This protects the document's relationship to its parent Parsha.
+     */
+    function isTorahInsightParentImmutableOnUpdate() {
+      return request.resource.data.parshaId == resource.data.parshaId;
+    }
+
+    /**
+     * @description Rules for the Parshiot collection, which stores metadata for each Torah portion.
+     * @path /parshiot/{parshaId}
+     * @allow (get) Any user, signed in or not, can read a Parsha document.
+     * @deny (create) A non-admin user cannot create a new Parsha document.
+     * @principle Public read with role-based writes. Content is open for consumption, but modification is restricted to trusted admins.
+     */
+    match /parshiot/{parshaId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isExistingDocAdmin();
+      allow delete: if isExistingDocAdmin();
+
+      /**
+       * @description Rules for Torah Insights, which are nested under their respective Parsha.
+       * @path /parshiot/{parshaId}/torahInsights/{torahInsightId}
+       * @allow (get) Any user, signed in or not, can read a Torah Insight.
+       * @deny (update) An authenticated, non-admin user cannot update a Torah Insight.
+       * @principle Enforces relational integrity and admin-only writes while allowing public reads. The `parshaId` in the document must match its parent path.
+       */
+      match /torahInsights/{torahInsightId} {
+        allow get, list: if true;
+        allow create: if isAdmin() && hasValidTorahInsightDataOnCreate(parshaId);
+        allow update: if isExistingDocAdmin() && isTorahInsightParentImmutableOnUpdate();
+        allow delete: if isExistingDocAdmin();
+      }
+    }
+
+    /**
+     * @description Rules for the admin roles collection. This collection is used as a lookup table to grant admin privileges.
+     * @path /roles_admin/{userId}
+     * @allow (read/write) No client is ever allowed to read or write to this collection directly.
+     * @deny (get) A user trying to read `/roles_admin/some_user_id` to check if they are an admin.
+     * @principle Security through obscurity and server-side control. Preventing client reads stops users from listing all admins. Preventing client writes is critical for security. Roles must ONLY be managed via the Firebase Console or a trusted backend server.
+     */
+    match /roles_admin/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

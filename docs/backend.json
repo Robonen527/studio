@@ -1,0 +1,151 @@
+{
+  "entities": {
+    "Parsha": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Parsha",
+      "type": "object",
+      "description": "Represents a Torah portion (Parsha).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Parsha entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the Parsha."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the Parsha."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "TorahInsight": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TorahInsight",
+      "type": "object",
+      "description": "Represents a Torah insight (Dvar Torah) for a specific Parsha.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Torah Insight entity."
+        },
+        "parshaId": {
+          "type": "string",
+          "description": "Reference to Parsha. (Relationship: Parsha 1:N TorahInsight)"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the Torah insight."
+        },
+        "content": {
+          "type": "string",
+          "description": "The content of the Torah insight."
+        },
+        "datePublished": {
+          "type": "string",
+          "description": "The date and time when the Torah insight was published.",
+          "format": "date-time"
+        },
+        "author": {
+          "type": "string",
+          "description": "The author of the Torah insight."
+        }
+      },
+      "required": [
+        "id",
+        "parshaId",
+        "title",
+        "content",
+        "datePublished"
+      ]
+    },
+    "AdminUser": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AdminUser",
+      "type": "object",
+      "description": "Represents an administrator user who can manage Torah insights.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Admin User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the admin user."
+        }
+      },
+      "required": [
+        "id",
+        "username"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/parshiot/{parshaId}",
+        "definition": {
+          "entityName": "Parsha",
+          "schema": {
+            "$ref": "#/backend/entities/Parsha"
+          },
+          "description": "Stores metadata for each Parsha (Torah portion). Publicly readable.",
+          "params": [
+            {
+              "name": "parshaId",
+              "description": "Unique identifier for the Parsha document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/parshiot/{parshaId}/torahInsights/{torahInsightId}",
+        "definition": {
+          "entityName": "TorahInsight",
+          "schema": {
+            "$ref": "#/backend/entities/TorahInsight"
+          },
+          "description": "Stores Torah insights (divrei Torah) for a specific Parsha.  Only accessible to admin users for create/update/delete operations. Publicly readable.",
+          "params": [
+            {
+              "name": "parshaId",
+              "description": "Unique identifier for the Parsha document."
+            },
+            {
+              "name": "torahInsightId",
+              "description": "Unique identifier for the Torah insight document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "AdminUser",
+          "schema": {
+            "$ref": "#/backend/entities/AdminUser"
+          },
+          "description": "Collection indicating admin role. The existence of a document for a user ID in this collection grants admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Auth ID of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to store Torah insights, categorized by Parsha (Torah portion), and manage administrative access.  It prioritizes authorization independence, clarity, and security. Since standard users only read the data, the structure is optimized for this read-heavy use case, while ensuring only admins can write. The key design choices are:\n\n1.  **Authorization Independence:**\n    *   Admin role is determined by membership in the `/roles_admin/{uid}` collection. This avoids the need for custom claims and complex `get()` calls in security rules.  The existence of a document for a user in `/roles_admin` grants admin privileges.\n\n2.  **Structural Segregation:**\n    *   `/parshiot` collection: Stores Parsha metadata.\n    *   `/parshiot/{parshaId}/torahInsights` subcollection: Stores Torah insights related to specific Parshiot.\n    *   `/roles_admin/{uid}`: Collection of admin users. The existence of a document here grants admin rights.\n\n3.  **Access Modeling:**\n    *   Parshiot: Publicly readable.\n    *   Torah Insights: Publicly readable.\n    *   Admin Role: Only the admin can create/update/delete documents in the `torahInsights` collection. Admin status is determined by document existence in `/roles_admin/{uid}`.\n\n4.  **QAPs (Rules are not Filters):**\n    *   Secure `list` operations are enabled because authorization is based on the existence of an admin role document. Rules only check the condition (admin role), and the structure inherently prevents unauthorized access.\n\n5.  **Radical Consistency**: Using consistent naming conventions (`parshaId`, `id`) and a predictable schema facilitates easier debugging and maintenance.\n\nThis structure enables simple and robust security rules because we only need to check for the existence of a document in `/roles_admin/{uid}` to grant admin permissions. All data related to Torah insights and Parshiot is publicly readable which meets the app's requirements. This design avoids complex rule logic and the pitfalls of hierarchical authorization dependencies."
+  }
+}
