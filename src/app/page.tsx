@@ -7,11 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
+
+// --- Debug Component ---
+function CurrentParshaDebug() {
+  const firestore = useFirestore();
+  const settingsDocRef = useMemoFirebase(() => doc(firestore, 'settings/currentParsha'), [firestore]);
+  const { data: setting, isLoading } = useDoc<{ slug: string }>(settingsDocRef);
+
+  return (
+    <div className="my-4 p-4 border-2 border-dashed border-red-500 bg-red-50 text-center">
+      <h3 className="font-bold text-red-800">בדיקת מצב DB (זמני)</h3>
+      {isLoading && <p>טוען הגדרה מה-DB...</p>}
+      {setting && <p>הערך השמור ב-DB הוא: <strong className="font-mono">{setting.slug}</strong></p>}
+      {!isLoading && !setting && <p>לא נמצאה הגדרה ידנית ב-DB.</p>}
+    </div>
+  );
+}
+// --- End Debug Component ---
+
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
@@ -58,6 +76,8 @@ export default function Home() {
         <h1 className="font-headline text-4xl md:text-6xl text-primary tracking-tight">מאיר בפרשה</h1>
         <p className="mt-2 text-lg text-muted-foreground">מחשבות והארות על פרשת השבוע</p>
       </div>
+
+      <CurrentParshaDebug />
 
       <Card className="w-full max-w-4xl mx-auto shadow-lg border-2 border-accent/50">
         <CardHeader>
