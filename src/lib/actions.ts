@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { parshiot } from "./parshiot";
 import type { Insight, Parsha } from "./types";
-import { HDate, Sedra, Event } from 'hebcal';
 import { insightsStore } from "./data";
 
 // Simulate network delay
@@ -52,31 +51,6 @@ export async function getInsightById(id: string) {
 
 export async function getCurrentParsha(): Promise<Parsha> {
     await delay(100);
-    
-    try {
-        const today = new HDate();
-        const saturday = today.onOrAfter(6); // 6 is Shabbat
-        const sedra = new Sedra(saturday.getFullYear(), true);
-        const parshaName = sedra.get(saturday);
-
-        if (parshaName && parshaName.length) {
-            // hebcal might return multiple parshiot (e.g., "Matot-Masei")
-            // We'll try to find a match for the combined name first, then split.
-            const combinedSlug = parshaName.join('-').toLowerCase();
-            const combinedParsha = parshiot.find(p => p.slug === combinedSlug);
-            if (combinedParsha) return combinedParsha;
-
-            // If no combined match, find the first one that matches
-            const firstParshaName = parshaName[0];
-            const parshaInfo = parshiot.find(p => p.name === firstParshaName);
-            if (parshaInfo) {
-                return parshaInfo;
-            }
-        }
-    } catch(e) {
-        console.error("Could not determine current parsha, falling back to default.", e);
-    }
-    
     // Fallback to a default if API fails or parsha not found
     const vayechi = parshiot.find(p => p.slug === 'vayechi');
     return vayechi || parshiot[11];
