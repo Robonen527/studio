@@ -6,8 +6,7 @@ import { parshiot } from "./parshiot";
 import type { Parsha } from "./types";
 import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
-import { getDoc } from "firebase/firestore";
-import { doc } from "firebase/firestore";
+import { doc, getDoc } from "firebase-admin/firestore";
 
 
 export async function getParshiot() {
