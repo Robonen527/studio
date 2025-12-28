@@ -100,7 +100,7 @@ export function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
             <FormItem>
               <FormLabel>שם משתמש</FormLabel>
               <FormControl>
-                <Input placeholder="admin" {...field} />
+                <Input placeholder="הזן שם משתמש" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
