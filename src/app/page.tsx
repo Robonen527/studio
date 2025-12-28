@@ -39,6 +39,9 @@ export default async function Home() {
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">עדיין לא נוספו דברי תורה לפרשה זו. שתף את דבר התורה הראשון!</p>
+              <div className="mt-4">
+                <AddInsightButton parshaSlug={currentParsha.slug} isPrimary={true}/>
+              </div>
             </div>
           )}
         </CardContent>
