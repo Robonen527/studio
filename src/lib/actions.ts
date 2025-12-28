@@ -6,7 +6,7 @@ import { parshiot } from "./parshiot";
 import type { Parsha } from "./types";
 import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 
 async function getFirestoreAdmin() {
     const { firestore } = await initializeAdminApp();
@@ -76,4 +76,6 @@ export async function getCurrentParsha(): Promise<Parsha> {
 export async function revalidateInsightPaths(parshaSlug: string) {
   revalidatePath("/");
   revalidatePath(`/parshiot/${parshaSlug}`);
+  revalidatePath("/parshiot");
 }
+
