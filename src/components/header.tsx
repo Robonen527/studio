@@ -10,7 +10,7 @@ export function Header() {
         <Link href="/" className="mr-6 flex items-center space-x-2 rtl:space-x-reverse">
           <TorahIcon className="h-6 w-6 text-primary" />
           <span className="font-headline text-2xl font-bold text-primary">
-            פניני תורה
+            פרשה מאיר-ה
           </span>
         </Link>
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end rtl:space-x-reverse">

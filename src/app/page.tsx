@@ -11,7 +11,7 @@ export default async function Home() {
   return (
     <div className="container mx-auto px-4 py-8 md:py-12">
       <div className="flex flex-col items-center text-center mb-12">
-        <h1 className="font-headline text-4xl md:text-6xl text-primary tracking-tight">פניני תורה</h1>
+        <h1 className="font-headline text-4xl md:text-6xl text-primary tracking-tight">פרשה מאיר-ה</h1>
         <p className="mt-2 text-lg text-muted-foreground">מחשבות והארות על פרשת השבוע</p>
       </div>
 

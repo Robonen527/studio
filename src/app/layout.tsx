@@ -7,7 +7,7 @@ import { Header } from "@/components/header";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "פניני תורה",
+  title: "פרשה מאיר-ה",
   description: "דברי תורה על פרשת השבוע",
 };
 

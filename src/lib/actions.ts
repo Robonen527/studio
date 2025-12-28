@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { insights } from "./data";
 import { parshiot } from "./parshiot";
-import type { Insight } from "./types";
+import type { Insight, Parsha } from "./types";
 
 // Simulate network delay
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -11,6 +11,20 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 export async function getParshiot() {
   await delay(500);
   return parshiot;
+}
+
+export async function getParshiotWithChumash() {
+  await delay(500);
+
+  const chumashim: { name: string; parshiot: Parsha[] }[] = [
+    { name: 'בראשית', parshiot: parshiot.slice(0, 12) },
+    { name: 'שמות', parshiot: parshiot.slice(12, 23) },
+    { name: 'ויקרא', parshiot: parshiot.slice(23, 33) },
+    { name: 'במדבר', parshiot: parshiot.slice(33, 43) },
+    { name: 'דברים', parshiot: parshiot.slice(43) },
+  ];
+
+  return chumashim;
 }
 
 export async function getParshaBySlug(slug: string) {
