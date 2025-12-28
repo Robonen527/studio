@@ -1,5 +1,8 @@
+
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+
+let db: Firestore;
 
 if (!admin.apps.length) {
   try {
@@ -12,14 +15,19 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
+    
+    db = getFirestore();
+
   } catch (error) {
     console.error('Failed to initialize Firebase Admin SDK:', error);
-    // In a development environment without credentials, you might want to avoid throwing an error
-    // and instead use a mock/dummy implementation or simply log the issue.
-    // For now, we will let it fail loudly if credentials are not there or invalid.
+    // In case of initialization error, db will not be assigned.
+    // We can't proceed without a db connection in a server environment that depends on it.
+    // Throwing an error or exiting might be appropriate in a real app.
+    // For this context, we will leave db as undefined and let calls to it fail.
   }
+} else {
+    // If the app is already initialized, get the firestore instance from the existing app.
+    db = getFirestore(admin.apps[0]);
 }
-
-const db = getFirestore();
 
 export { db };
