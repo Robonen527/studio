@@ -24,7 +24,7 @@ export function AuthButton() {
   const isAdmin = !!user;
 
   if (isUserLoading) {
-    return <Skeleton className="h-9 w-28" />
+    return <Skeleton className="h-9 w-9 md:w-28" />
   }
 
   const handleLoginSuccess = () => {
@@ -32,7 +32,9 @@ export function AuthButton() {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) {
+      await signOut(auth);
+    }
   }
 
   const handleButtonClick = () => {
@@ -45,9 +47,11 @@ export function AuthButton() {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleButtonClick}>
-        {isAdmin ? <LogOut className="ml-2 h-4 w-4" /> : <LogIn className="ml-2 h-4 w-4" />}
-        {isAdmin ? 'יציאת מנהל' : 'כניסת מנהל'}
+      <Button variant="outline" size="sm" onClick={handleButtonClick} className="w-9 px-0 md:w-auto md:px-3">
+        {isAdmin ? <LogOut className="md:ml-2 h-4 w-4" /> : <LogIn className="md:ml-2 h-4 w-4" />}
+        <span className="sr-only md:not-sr-only">
+          {isAdmin ? 'יציאת מנהל' : 'כניסת מנהל'}
+        </span>
       </Button>
       {!isAdmin && (
         <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
