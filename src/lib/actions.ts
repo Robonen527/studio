@@ -75,13 +75,12 @@ export async function getAllInsightsAsText(): Promise<string> {
     const { firestore } = await initializeAdminApp();
     const allParshiot = await getParshiot();
     let fullText = `כל דברי התורה מאתר "מאיר בפרשה"\n`;
-    fullText += `תאריך הפקה: ${new Date().toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n`;
+    fullText += `תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}\n`;
     fullText += '============================================\n\n';
 
     for (const parsha of allParshiot) {
       const insightsRef = collection(firestore, `parshiot/${parsha.slug}/torahInsights`);
-      const insightsQuery = adminQuery(insightsRef, orderBy('createdAt', 'desc'));
-      const insightsSnapshot = await getDocs(insightsQuery);
+      const insightsSnapshot = await getDocs(insightsRef);
 
       if (!insightsSnapshot.empty) {
         fullText += `פרשת ${parsha.name}\n`;
@@ -89,10 +88,7 @@ export async function getAllInsightsAsText(): Promise<string> {
 
         insightsSnapshot.forEach(doc => {
           const insight = doc.data() as Insight;
-          const date = new Date(insight.createdAt).toLocaleDateString('he-IL');
-          fullText += `כותרת: ${insight.title}\n`;
-          fullText += `מאת: ${insight.author}\n`;
-          fullText += `תאריך: ${date}\n\n`;
+          fullText += `כותרת: ${insight.title}\n\n`;
           fullText += `${insight.content}\n\n`;
           fullText += '--------------------------\n\n';
         });
@@ -101,7 +97,7 @@ export async function getAllInsightsAsText(): Promise<string> {
     return fullText;
   } catch (error) {
     console.error("Error fetching all insights:", error);
-    return "שגיאה: לא ניתן היה לייצא את דברי התורה.";
+    throw new Error("שגיאה: לא ניתן היה לייצא את דברי התורה.");
   }
 }
 
