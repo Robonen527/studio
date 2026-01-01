@@ -129,6 +129,7 @@ export default function Home() {
             <div className="space-y-4">
               <h3 className="font-headline text-xl md:text-2xl text-accent-foreground">{latestInsight.title}</h3>
               <p className="text-base/relaxed md:text-lg/relaxed whitespace-pre-wrap">{latestInsight.content}</p>
+
               <div className="flex justify-center pt-4">
                 <Button asChild variant="outline">
                   <Link href={`/parshiot/${currentParsha.slug}`}>לכל דברי התורה על פרשת {currentParsha.name}</Link>
