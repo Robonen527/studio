@@ -70,38 +70,6 @@ export async function getCurrentParsha(): Promise<Parsha> {
     return parshiot.find(p => p.slug === 'bereshit') || parshiot[0];
 }
 
-export async function getAllInsightsAsText(): Promise<string> {
-  try {
-    const { firestore } = await initializeAdminApp();
-    const allParshiot = await getParshiot();
-    let fullText = `כל דברי התורה מאתר "מאיר בפרשה"\n`;
-    fullText += `תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}\n`;
-    fullText += '============================================\n\n';
-
-    for (const parsha of allParshiot) {
-      const insightsRef = collection(firestore, `parshiot/${parsha.slug}/torahInsights`);
-      const insightsSnapshot = await getDocs(insightsRef);
-
-      if (!insightsSnapshot.empty) {
-        fullText += `פרשת ${parsha.name}\n`;
-        fullText += '--------------------------\n\n';
-
-        insightsSnapshot.forEach(doc => {
-          const insight = doc.data() as Insight;
-          fullText += `כותרת: ${insight.title}\n\n`;
-          fullText += `${insight.content}\n\n`;
-          fullText += '--------------------------\n\n';
-        });
-      }
-    }
-    return fullText;
-  } catch (error) {
-    console.error("Error fetching all insights:", error);
-    throw new Error("שגיאה: לא ניתן היה לייצא את דברי התורה.");
-  }
-}
-
-
 export async function revalidateInsightPaths(parshaSlug: string) {
   revalidatePath("/");
   revalidatePath(`/parshiot/${parshaSlug}`);

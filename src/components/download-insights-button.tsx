@@ -4,23 +4,56 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
-import { useUser } from '@/firebase';
-import { getAllInsightsAsText } from '@/lib/actions';
+import { useUser, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { collection, getDocs } from 'firebase/firestore';
+import { getParshiot } from '@/lib/actions';
+import type { Insight, Parsha } from '@/lib/types';
+
 
 export function DownloadInsightsButton() {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   
   const isAdmin = !!user;
 
   const handleDownload = () => {
+    if (!firestore) {
+        toast({
+            variant: "destructive",
+            title: "שגיאה",
+            description: "שירות מסד הנתונים אינו זמין. נסה לרענן את הדף.",
+        });
+        return;
+    }
     startTransition(async () => {
       try {
-        const textContent = await getAllInsightsAsText();
+        let fullText = `כל דברי התורה מאתר "מאיר בפרשה"\n`;
+        fullText += `תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}\n`;
+        fullText += '============================================\n\n';
+
+        const allParshiot = await getParshiot();
+
+        for (const parsha of allParshiot) {
+          const insightsRef = collection(firestore, `parshiot/${parsha.slug}/torahInsights`);
+          const insightsSnapshot = await getDocs(insightsRef);
+
+          if (!insightsSnapshot.empty) {
+            fullText += `פרשת ${parsha.name}\n`;
+            fullText += '--------------------------\n\n';
+
+            insightsSnapshot.forEach(doc => {
+              const insight = doc.data() as Insight;
+              fullText += `כותרת: ${insight.title}\n\n`;
+              fullText += `${insight.content}\n\n`;
+              fullText += '--------------------------\n\n';
+            });
+          }
+        }
         
-        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
