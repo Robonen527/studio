@@ -13,6 +13,7 @@ import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
 import { HDate, Sedra } from 'hebcal';
+import { DownloadInsightsButton } from '@/components/download-insights-button';
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
@@ -147,10 +148,11 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <div className="mt-12 text-center">
+      <div className="mt-12 text-center space-y-4">
         <Button asChild size="lg">
           <Link href="/parshiot">לכל הפרשות</Link>
         </Button>
+        <DownloadInsightsButton />
       </div>
     </div>
   );
