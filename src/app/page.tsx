@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getCurrentParsha as getParshaByDate, getParshaBySlug } from "@/lib/actions";
+import { getParshaBySlug } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
+import { HDate, Sedra } from 'hebcal';
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
@@ -25,8 +26,24 @@ export default function Home() {
   const [dateBasedParsha, setDateBasedParsha] = useState<Parsha | null>(null);
   useEffect(() => {
     async function fetchParshaByDate() {
-      const parsha = await getParshaByDate();
-      setDateBasedParsha(parsha);
+        try {
+            const today = new HDate();
+            const sedra = new Sedra(today.getFullYear(), false);
+            const parshaName = sedra.get(today);
+            if (parshaName) {
+                const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
+                const parshaInfo = await getParshaBySlug(parshaKey.toLowerCase().replace(/ /g, '-'));
+                if (parshaInfo) {
+                  setDateBasedParsha(parshaInfo);
+                  return;
+                }
+            }
+        } catch (e) {
+            console.error("Could not determine current parsha from Hebcal:", e);
+        }
+        // Fallback
+        const defaultParsha = await getParshaBySlug('bereshit');
+        setDateBasedParsha(defaultParsha);
     }
     fetchParshaByDate();
   }, []);
