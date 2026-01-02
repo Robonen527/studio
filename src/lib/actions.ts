@@ -25,8 +25,9 @@ export async function getParshiotWithChumash() {
   return chumashim;
 }
 
-export async function getParshaBySlug(slug: string) {
-  return parshiot.find((p) => p.slug === slug) || null;
+export async function getParshaBySlug(slug: string): Promise<Parsha | null> {
+  const parsha = parshiot.find((p) => p.slug === slug);
+  return parsha ? { ...parsha } : null;
 }
 
 export async function getCurrentParsha(): Promise<Parsha> {

@@ -13,6 +13,8 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { parshiot } from '@/lib/parshiot';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 type ParshaDetailPageProps = {
   params: {
@@ -24,6 +26,8 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   const [parsha, setParsha] = useState<Parsha | null>(null);
   const [slug, setSlug] = useState('');
   const firestore = useFirestore();
+
+  const [parshaIndex, setParshaIndex] = useState(-1);
 
   useEffect(() => {
     if (params.slug) {
@@ -42,6 +46,8 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
       setParsha(p);
       if(p) {
         document.title = `פרשת ${p.name} | מאיר בפרשה`;
+        const currentIndex = parshiot.findIndex(parsha => parsha.slug === p.slug);
+        setParshaIndex(currentIndex);
       }
     }
     fetchParsha();
@@ -55,6 +61,9 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   [firestore, parsha]);
 
   const { data: insights, isLoading } = useCollection<Insight>(insightsQuery);
+
+  const prevParsha = parshaIndex > 0 ? parshiot[parshaIndex - 1] : null;
+  const nextParsha = parshaIndex < parshiot.length - 1 ? parshiot[parshaIndex + 1] : null;
 
   if (!parsha) {
     return (
@@ -70,15 +79,38 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12">
+
+      <div className="flex justify-between items-center mb-4">
+        {nextParsha ? (
+          <Button asChild variant="outline">
+            <Link href={`/parshiot/${nextParsha.slug}`}>
+              <span className="hidden md:inline">לפרשה הבאה: {nextParsha.name}</span>
+              <span className="md:hidden">הבא</span>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : <div />}
+        {prevParsha ? (
+           <Button asChild variant="outline">
+            <Link href={`/parshiot/${prevParsha.slug}`}>
+              <ArrowRight className="ml-2 h-4 w-4" />
+               <span className="hidden md:inline">לפרשה הקודמת: {prevParsha.name}</span>
+               <span className="md:hidden">הקודם</span>
+            </Link>
+          </Button>
+        ) : <div />}
+      </div>
+
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-        <div className="mb-4 md:mb-0">
+        <div className="mb-4 md:mb-0 text-center md:text-right w-full">
           <h1 className="font-headline text-3xl md:text-5xl text-primary">פרשת {parsha.name}</h1>
           <Link href="/parshiot" className="text-sm text-muted-foreground hover:text-primary transition-colors">
             &larr; חזרה לכל הפרשות
           </Link>
         </div>
-        <div className="mt-4 md:mt-0">
-          <AddInsightButton parshaSlug={parsha.slug} />
+        <div className="mt-4 md:mt-0 flex-shrink-0">
+          <AddInsightButton parsha={parsha} />
         </div>
       </div>
 
@@ -114,7 +146,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
           <h2 className="text-xl font-semibold text-muted-foreground">עדיין אין דברי תורה לפרשה זו</h2>
           <p className="mt-2 text-muted-foreground">היה הראשון להוסיף דבר תורה!</p>
           <div className="mt-6">
-            <AddInsightButton parshaSlug={parsha.slug} isPrimary={true} />
+            <AddInsightButton parsha={parsha} isPrimary={true} />
           </div>
         </div>
       )}

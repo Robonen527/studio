@@ -13,13 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { InsightForm } from "./insight-form";
 import { useUser } from "@/firebase";
+import type { Parsha } from "@/lib/types";
 
 type AddInsightButtonProps = {
-  parshaSlug: string;
+  parsha: Parsha;
   isPrimary?: boolean;
 };
 
-export function AddInsightButton({ parshaSlug, isPrimary = false }: AddInsightButtonProps) {
+export function AddInsightButton({ parsha, isPrimary = false }: AddInsightButtonProps) {
   const { user, isUserLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   
@@ -41,10 +42,10 @@ export function AddInsightButton({ parshaSlug, isPrimary = false }: AddInsightBu
           <DialogHeader>
             <DialogTitle className="font-headline text-2xl">הוספת דבר תורה חדש</DialogTitle>
             <DialogDescription>
-              מלא את הפרטים הבאים כדי להוסיף דבר תורה לפרשה.
+              מלא את הפרטים הבאים כדי להוסיף דבר תורה לפרשת {parsha.name}.
             </DialogDescription>
           </DialogHeader>
-          <InsightForm parshaSlug={parshaSlug} onFinished={() => setIsOpen(false)} />
+          <InsightForm parsha={parsha} onFinished={() => setIsOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

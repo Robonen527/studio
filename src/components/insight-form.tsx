@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Insight } from "@/lib/types";
+import type { Insight, Parsha } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { useFirestore, addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
@@ -31,33 +31,37 @@ const formSchema = z.object({
 });
 
 type InsightFormProps = {
-  parshaSlug: string;
+  parsha: Parsha;
   insightToEdit?: Insight;
   onFinished: () => void;
 };
 
-export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFormProps) {
+export function InsightForm({ parsha, insightToEdit, onFinished }: InsightFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: insightToEdit?.title || "",
-      author: insightToEdit?.author || "",
-      content: insightToEdit?.content || "",
-    },
+    defaultValues: insightToEdit
+    ? { // Values for editing
+        title: insightToEdit.title,
+        author: insightToEdit.author,
+        content: insightToEdit.content,
+      }
+    : { // Default values for adding
+        title: `פרשת ${parsha.name}`,
+        author: 'מאיר רונן',
+        content: '',
+      },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
       try {
-        const collectionRef = collection(firestore, `parshiot/${parshaSlug}/torahInsights`);
-        
         if (insightToEdit) {
           // Editing existing insight
-          const docRef = doc(firestore, `parshiot/${parshaSlug}/torahInsights`, insightToEdit.id);
+          const docRef = doc(firestore, `parshiot/${insightToEdit.parshaSlug}/torahInsights`, insightToEdit.id);
           const dataToUpdate = { ...values };
           setDocumentNonBlocking(docRef, dataToUpdate, { merge: true });
           toast({
@@ -66,9 +70,10 @@ export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFo
           });
         } else {
           // Adding new insight
+          const collectionRef = collection(firestore, `parshiot/${parsha.slug}/torahInsights`);
           const dataToAdd = {
             ...values,
-            parshaSlug,
+            parshaSlug: parsha.slug,
             createdAt: new Date().toISOString(),
           };
           addDocumentNonBlocking(collectionRef, dataToAdd);
@@ -78,7 +83,7 @@ export function InsightForm({ parshaSlug, insightToEdit, onFinished }: InsightFo
           });
         }
 
-        await revalidateInsightPaths(parshaSlug);
+        await revalidateInsightPaths(insightToEdit ? insightToEdit.parshaSlug : parsha.slug);
         onFinished();
         
       } catch (error) {
