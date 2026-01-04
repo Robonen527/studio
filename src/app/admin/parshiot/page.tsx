@@ -70,8 +70,13 @@ function SeedButton() {
                 // Optionally trigger a page reload
                 window.location.reload();
 
-            } catch(e) {
+            } catch(e: any) {
                 console.error(e);
+                const permissionError = new FirestorePermissionError({
+                    path: 'batch operation',
+                    operation: 'write',
+                });
+                errorEmitter.emit('permission-error', permissionError);
                 toast({
                     variant: "destructive",
                     title: "שגיאה",
@@ -90,27 +95,32 @@ function SeedButton() {
 }
 
 
-function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: Chumash, totalChumashim: number, onFinished: () => void }) {
-    const [name, setName] = useState(chumash?.name || '');
+function EditCategoryDialog({ category, totalCategories, onFinished }: { category?: Chumash, totalCategories: number, onFinished: () => void }) {
+    const [name, setName] = useState(category?.name || '');
     const [isPending, startTransition] = useTransition();
     const firestore = useFirestore();
     const { toast } = useToast();
 
     const handleSubmit = () => {
+        if (!firestore) return;
         if (!name) {
             toast({ variant: 'destructive', title: 'שם הקטגוריה חסר' });
             return;
         }
         startTransition(async () => {
             try {
-                const isEditing = !!chumash;
-                const id = isEditing ? chumash.id : createSlug(name);
+                const isEditing = !!category;
+                const id = isEditing ? category.id : createSlug(name);
+                if (!id) {
+                     toast({ variant: 'destructive', title: 'מזהה קטגוריה חסר' });
+                     return;
+                }
+
                 const docRef = doc(firestore, 'chumashim', id);
                 
-                const dataToSave: Chumash = {
-                    id,
+                const dataToSave: Omit<Chumash, 'id'> = {
                     name,
-                    order: isEditing && chumash.order ? chumash.order : totalChumashim + 1
+                    order: isEditing && category.order ? category.order : totalCategories + 1
                 };
 
                 await setDoc(docRef, dataToSave, { merge: true });
@@ -119,8 +129,8 @@ function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: 
                 toast({ title: 'הקטגוריה נשמרה בהצלחה' });
                 onFinished();
             } catch (e: any) {
-                console.error("Error saving category:", e);
-                const docRef = doc(firestore, 'chumashim', chumash ? chumash.id : createSlug(name));
+                const docId = category ? category.id : createSlug(name);
+                const docRef = doc(firestore, 'chumashim', docId);
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -137,7 +147,7 @@ function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: 
     return (
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>{chumash ? 'עריכת קטגוריה' : 'הוספת קטגוריה חדשה'}</DialogTitle>
+                <DialogTitle>{category ? 'עריכת קטגוריה' : 'הוספת קטגוריה חדשה'}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -163,6 +173,7 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
     const { toast } = useToast();
 
     const handleSubmit = () => {
+        if (!firestore) return;
         if (!name) {
             toast({ variant: 'destructive', title: 'שם הפרשה חסר' });
             return;
@@ -176,7 +187,6 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
                 toast({ title: 'הפרשה נשמרה בהצלחה' });
                 onFinished();
             } catch (e: any) {
-                console.error("Error saving parsha:", e);
                 const docRef = doc(firestore, 'parshiot', parsha ? parsha.id : createSlug(name));
                 errorEmitter.emit(
                     'permission-error',
@@ -218,10 +228,10 @@ export default function AdminParshiotPage() {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
     const firestore = useFirestore();
-    const [dialog, setDialog] = useState<{ type: 'chumash' | 'parsha'; payload?: any } | null>(null);
+    const [dialog, setDialog] = useState<{ type: 'category' | 'parsha'; payload?: any } | null>(null);
 
     const chumashimQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'chumashim'), orderBy('order')) : null, [firestore]);
-    const { data: chumashim, isLoading: isLoadingChumashim } = useCollection<Chumash>(chumashimQuery);
+    const { data: categories, isLoading: isLoadingCategories } = useCollection<Chumash>(chumashimQuery);
 
     const parshiotQuery = useMemoFirebase(() => firestore ? collection(firestore, 'parshiot') : null, [firestore]);
     const { data: parshiot, isLoading: isLoadingParshiot } = useCollection<Parsha>(parshiotQuery);
@@ -232,7 +242,7 @@ export default function AdminParshiotPage() {
         }
     }, [user, isUserLoading, router]);
 
-    const parshiotByChumashId = useMemo(() => {
+    const parshiotByCategoryId = useMemo(() => {
         if (!parshiot) return {};
         return parshiot.reduce((acc, parsha) => {
             if (!acc[parsha.chumashId]) {
@@ -243,14 +253,14 @@ export default function AdminParshiotPage() {
         }, {} as Record<string, Parsha[]>);
     }, [parshiot]);
 
-    const handleDeleteChumash = async (chumashId: string) => {
+    const handleDeleteCategory = async (categoryId: string) => {
         if (!firestore) return;
-        if (parshiotByChumashId[chumashId]?.length > 0) {
+        if (parshiotByCategoryId[categoryId]?.length > 0) {
             alert('לא ניתן למחוק קטגוריה שיש בה פרשות.');
             return;
         }
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
-            const docRef = doc(firestore, 'chumashim', chumashId);
+            const docRef = doc(firestore, 'chumashim', categoryId);
             try {
                 await deleteDoc(docRef);
                 await revalidateInsightPaths();
@@ -287,8 +297,8 @@ export default function AdminParshiotPage() {
         }
     };
     
-    const isLoading = isUserLoading || isLoadingChumashim || isLoadingParshiot;
-    const isDataEmpty = !isLoading && (!chumashim || chumashim.length === 0);
+    const isLoading = isUserLoading || isLoadingCategories || isLoadingParshiot;
+    const isDataEmpty = !isLoading && (!categories || categories.length === 0);
 
     if (isLoading) {
         return (
@@ -319,7 +329,7 @@ export default function AdminParshiotPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         {isDataEmpty && <SeedButton />}
-                        <Button onClick={() => setDialog({ type: 'chumash' })}>
+                        <Button onClick={() => setDialog({ type: 'category' })}>
                             <Plus className="ml-2" />
                             הוסף קטגוריה
                         </Button>
@@ -327,18 +337,18 @@ export default function AdminParshiotPage() {
                 </div>
 
                 <div className="space-y-8">
-                    {chumashim?.map(chumash => (
-                        <Card key={chumash.id}>
+                    {categories?.map(category => (
+                        <Card key={category.id}>
                             <CardHeader className="flex flex-row justify-between items-center">
-                                <CardTitle className="font-headline text-3xl text-primary/90">{chumash.name}</CardTitle>
+                                <CardTitle className="font-headline text-3xl text-primary/90">{category.name}</CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <Button variant="ghost" size="icon" onClick={() => setDialog({ type: 'chumash', payload: chumash })}>
+                                    <Button variant="ghost" size="icon" onClick={() => setDialog({ type: 'category', payload: category })}>
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteChumash(chumash.id)}>
+                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteCategory(category.id)}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setDialog({type: 'parsha', payload: {chumashId: chumash.id}})}>
+                                    <Button variant="outline" size="sm" onClick={() => setDialog({type: 'parsha', payload: {chumashId: category.id}})}>
                                         <Plus className="ml-2 h-4 w-4" />
                                         הוסף פרשה
                                     </Button>
@@ -346,11 +356,11 @@ export default function AdminParshiotPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {(parshiotByChumashId[chumash.id] || []).map(parsha => (
+                                    {(parshiotByCategoryId[category.id] || []).map(parsha => (
                                         <div key={parsha.id} className="group relative rounded-md border p-3 flex justify-between items-center">
                                             <span className="font-medium">{parsha.name}</span>
                                             <div className="absolute top-1 left-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDialog({ type: 'parsha', payload: { parsha, chumashId: chumash.id }})}>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDialog({ type: 'parsha', payload: { parsha, chumashId: category.id }})}>
                                                     <Edit className="h-3 w-3" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteParsha(parsha.id)}>
@@ -359,7 +369,7 @@ export default function AdminParshiotPage() {
                                             </div>
                                         </div>
                                     ))}
-                                    { (parshiotByChumashId[chumash.id] || []).length === 0 && (
+                                    { (parshiotByCategoryId[category.id] || []).length === 0 && (
                                         <p className="text-sm text-muted-foreground col-span-full">אין פרשות לקטגוריה זו.</p>
                                     )}
                                 </div>
@@ -370,9 +380,11 @@ export default function AdminParshiotPage() {
             </div>
 
             <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
-                {dialog?.type === 'chumash' && <EditChumashDialog chumash={dialog.payload} totalChumashim={chumashim?.length || 0} onFinished={() => setDialog(null)} />}
+                {dialog?.type === 'category' && <EditCategoryDialog category={dialog.payload} totalCategories={categories?.length || 0} onFinished={() => setDialog(null)} />}
                 {dialog?.type === 'parsha' && <EditParshaDialog parsha={dialog.payload?.parsha} chumashId={dialog.payload.chumashId} onFinished={() => setDialog(null)} />}
             </Dialog>
         </>
     );
 }
+
+    
