@@ -59,7 +59,7 @@ function SeedButton() {
                 await batch.commit();
 
                 // Call the server action to revalidate paths
-                await seedParshiotAndChumashim();
+                await revalidateInsightPaths();
 
                 toast({
                     title: "הצלחה",
@@ -89,7 +89,7 @@ function SeedButton() {
 }
 
 
-function EditChumashDialog({ chumash, onFinished }: { chumash?: Chumash, onFinished: () => void }) {
+function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: Chumash, totalChumashim: number, onFinished: () => void }) {
     const [name, setName] = useState(chumash?.name || '');
     const [order, setOrder] = useState(chumash?.order || 0);
     const [isPending, startTransition] = useTransition();
@@ -103,9 +103,18 @@ function EditChumashDialog({ chumash, onFinished }: { chumash?: Chumash, onFinis
         }
         startTransition(async () => {
             try {
-                const id = chumash ? chumash.id : createSlug(name);
+                const isEditing = !!chumash;
+                const id = isEditing ? chumash.id : createSlug(name);
                 const docRef = doc(firestore, 'chumashim', id);
-                setDocumentNonBlocking(docRef, { name, order, id }, { merge: true });
+                
+                const dataToSave: Chumash = {
+                    id,
+                    name,
+                    // If editing, keep original order. If adding, set to be the last.
+                    order: isEditing ? order : totalChumashim + 1
+                };
+
+                setDocumentNonBlocking(docRef, dataToSave, { merge: true });
                 await revalidateInsightPaths();
                 toast({ title: 'החומש נשמר בהצלחה' });
                 onFinished();
@@ -125,10 +134,12 @@ function EditChumashDialog({ chumash, onFinished }: { chumash?: Chumash, onFinis
                     <Label htmlFor="chumash-name" className="text-right">שם</Label>
                     <Input id="chumash-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="chumash-order" className="text-right">סדר</Label>
-                    <Input id="chumash-order" type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} className="col-span-3" />
-                </div>
+                 {chumash && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="chumash-order" className="text-right">סדר</Label>
+                        <Input id="chumash-order" type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} className="col-span-3" />
+                    </div>
+                )}
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={onFinished}>ביטול</Button>
@@ -323,7 +334,7 @@ export default function AdminParshiotPage() {
             </div>
 
             <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
-                {dialog?.type === 'chumash' && <EditChumashDialog chumash={dialog.payload} onFinished={() => setDialog(null)} />}
+                {dialog?.type === 'chumash' && <EditChumashDialog chumash={dialog.payload} totalChumashim={chumashim?.length || 0} onFinished={() => setDialog(null)} />}
                 {dialog?.type === 'parsha' && <EditParshaDialog parsha={dialog.payload?.parsha} chumashId={dialog.payload.chumashId} onFinished={() => setDialog(null)} />}
             </Dialog>
         </>
