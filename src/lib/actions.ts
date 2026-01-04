@@ -16,17 +16,14 @@ async function isFirestoreEmpty() {
 
 export async function getParshiot(): Promise<Parsha[]> {
   try {
-    // Check if seeding is needed first
     const empty = await isFirestoreEmpty();
     if (empty) {
         console.log('No parshiot found in Firestore. Seeding now.');
         await seedParshiotAndChumashim();
     }
   } catch(e) {
-    console.error("Error checking or seeding Firestore:", e);
-    // If seeding fails, we probably can't continue.
-    // Return empty array to avoid further errors down the line.
-    return [];
+    // Log the error but don't stop execution. Assume data might exist anyway.
+    console.error("Error during initial check/seed:", e);
   }
     
   try {
@@ -35,6 +32,12 @@ export async function getParshiot(): Promise<Parsha[]> {
     const snapshot = await getDocs(parshiotRef);
     const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
     
+    // If parshiot are still empty after the attempt, it might mean seeding failed and we should retry once.
+    if (parshiot.length === 0) {
+        console.log('Still no parshiot, attempting to seed again.');
+        return await seedParshiotAndChumashim();
+    }
+
     const chumashim = await getChumashim();
     const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
@@ -48,7 +51,7 @@ export async function getParshiot(): Promise<Parsha[]> {
 
   } catch (e) {
     console.error("Error in getParshiot after attempting to seed:", e);
-    return []; // Return empty array on failure
+    return []; // Return empty array on final failure
   }
 }
 
@@ -233,5 +236,7 @@ async function seedParshiotAndChumashim(): Promise<Parsha[]> {
     const snapshot = await getDocs(parshiotRef);
     return snapshot.docs.map(d => ({id: d.id, ...d.data()}) as Parsha);
 }
+
+    
 
     
