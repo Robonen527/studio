@@ -7,18 +7,34 @@ import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
 import { doc, getDoc, collection, getDocs, orderBy, query as adminQuery } from "firebase-admin/firestore";
 
+async function isFirestoreEmpty() {
+    const { firestore } = await initializeAdminApp();
+    const parshiotRef = collection(firestore, 'parshiot');
+    const snapshot = await getDocs(parshiotRef);
+    return snapshot.empty;
+}
+
 export async function getParshiot(): Promise<Parsha[]> {
+  try {
+    // Check if seeding is needed first
+    const empty = await isFirestoreEmpty();
+    if (empty) {
+        console.log('No parshiot found in Firestore. Seeding now.');
+        await seedParshiotAndChumashim();
+    }
+  } catch(e) {
+    console.error("Error checking or seeding Firestore:", e);
+    // If seeding fails, we probably can't continue.
+    // Return empty array to avoid further errors down the line.
+    return [];
+  }
+    
   try {
     const { firestore } = await initializeAdminApp();
     const parshiotRef = collection(firestore, 'parshiot');
     const snapshot = await getDocs(parshiotRef);
-    if (snapshot.empty) {
-      console.log('No parshiot found in Firestore. Seeding now.');
-      return await seedParshiotAndChumashim();
-    }
     const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
     
-    // We need to get the chumash order to sort the parshiot correctly
     const chumashim = await getChumashim();
     const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
@@ -31,9 +47,8 @@ export async function getParshiot(): Promise<Parsha[]> {
     return parshiot;
 
   } catch (e) {
-    console.error("Error in getParshiot:", e);
-    // Fallback to seeding if there's an error, as this might be a first-run scenario.
-    return await seedParshiotAndChumashim();
+    console.error("Error in getParshiot after attempting to seed:", e);
+    return []; // Return empty array on failure
   }
 }
 
@@ -43,7 +58,7 @@ export async function getChumashim(): Promise<Chumash[]> {
     const q = adminQuery(chumashimRef, orderBy('order'));
     const snapshot = await getDocs(q);
     if (snapshot.empty) {
-        return []; // Should be seeded by getParshiot
+        return [];
     }
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chumash));
 }
@@ -81,8 +96,6 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
     const parshiot = await getParshiot();
     if (!parshiot || parshiot.length === 0) return null;
     
-    // This function will now primarily be for date-based calculation,
-    // as the manual override is handled client-side on the homepage.
     try {
         const { firestore } = await initializeAdminApp();
         const settingsRef = doc(firestore, 'settings', 'currentParsha');
@@ -99,14 +112,12 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not fetch manual parsha override from server:", e);
     }
     
-    // Fallback to Hebcal if no manual override is set or found
     try {
         const today = new HDate();
         const sedra = new Sedra(today.getFullYear(), false);
         const parshaName = sedra.get(today);
 
         if (parshaName) {
-             // Hebcal returns an array for combined parshiot
             const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
             const parshaInfo = parshiot.find(p => p.name === parshaKey);
             if (parshaInfo) {
@@ -117,7 +128,6 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not determine current parsha from Hebcal:", e);
     }
     
-    // Fallback to a default if all else fails
     return parshiot.find(p => p.id === 'bereshit') || parshiot[0];
 }
 
@@ -217,5 +227,11 @@ async function seedParshiotAndChumashim(): Promise<Parsha[]> {
 
     await batch.commit();
     console.log('Successfully seeded Chumashim and Parshiot.');
-    return finalParshiot;
+    // Re-fetch after seeding to ensure sorting
+    const { firestore: fs2 } = await initializeAdminApp();
+    const parshiotRef = collection(fs2, 'parshiot');
+    const snapshot = await getDocs(parshiotRef);
+    return snapshot.docs.map(d => ({id: d.id, ...d.data()}) as Parsha);
 }
+
+    
