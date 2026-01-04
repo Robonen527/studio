@@ -81,21 +81,21 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
     <div className="container mx-auto px-4 py-8 md:py-12">
 
       <div className="flex justify-between items-center mb-4">
-        {nextParsha ? (
-          <Button asChild variant="outline">
-            <Link href={`/parshiot/${nextParsha.slug}`}>
-              <span className="hidden md:inline">לפרשה הבאה: {nextParsha.name}</span>
-              <span className="md:hidden">הבא</span>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            </Link>
-          </Button>
-        ) : <div />}
         {prevParsha ? (
            <Button asChild variant="outline">
             <Link href={`/parshiot/${prevParsha.slug}`}>
               <ArrowRight className="ml-2 h-4 w-4" />
                <span className="hidden md:inline">לפרשה הקודמת: {prevParsha.name}</span>
                <span className="md:hidden">הקודם</span>
+            </Link>
+          </Button>
+        ) : <div />}
+        {nextParsha ? (
+          <Button asChild variant="outline">
+            <Link href={`/parshiot/${nextParsha.slug}`}>
+              <span className="hidden md:inline">לפרשה הבאה: {nextParsha.name}</span>
+              <span className="md:hidden">הבא</span>
+              <ArrowLeft className="mr-2 h-4 w-4" />
             </Link>
           </Button>
         ) : <div />}
