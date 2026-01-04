@@ -18,15 +18,15 @@ export async function getParshiot(): Promise<Parsha[]> {
   try {
     const { firestore } = await initializeAdminApp();
     
-    // Check if the DB is empty and seed it if needed. This is more robust.
     if (await isFirestoreEmpty('parshiot')) {
+        console.log("Parshiot collection is empty, attempting to seed...");
         await seedParshiotAndChumashim();
     }
 
     const parshiotRef = collection(firestore, 'parshiot');
     const snapshot = await getDocs(parshiotRef);
     if (snapshot.empty) {
-        console.log("Firestore is empty even after seeding attempt, falling back to static data.");
+        console.log("Firestore is still empty after seeding attempt, falling back to static data.");
         return getStaticParshiotData().parshiot;
     }
     
@@ -35,15 +35,12 @@ export async function getParshiot(): Promise<Parsha[]> {
     const chumashim = await getChumashim();
     const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
-    // Sort parshiot based on chumash order
     parshiot.sort((a, b) => {
       const orderA = chumashOrderMap.get(a.chumashId) ?? 99;
       const orderB = chumashOrderMap.get(b.chumashId) ?? 99;
       if (orderA !== orderB) {
         return orderA - orderB;
       }
-      // If in the same chumash, we need a secondary sort order.
-      // For now, this is missing, but this structure allows it.
       return a.name.localeCompare(b.name, 'he');
     });
 
@@ -63,8 +60,9 @@ export async function getChumashim(): Promise<Chumash[]> {
         const q = adminQuery(chumashimRef, orderBy('order'));
         const snapshot = await getDocs(q);
         if (snapshot.empty) {
-            // Attempt to seed if empty
-            await seedParshiotAndChumashim();
+             if (await isFirestoreEmpty('chumashim')) {
+                await seedParshiotAndChumashim();
+            }
             const seededSnapshot = await getDocs(q);
              if (seededSnapshot.empty) {
                 console.warn("Chumashim collection is empty even after seeding, returning static data.");
@@ -136,14 +134,12 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not fetch manual parsha override from server:", e);
     }
     
-    // Fallback to date-based calculation
     try {
         const today = new HDate();
         const sedra = new Sedra(today.getFullYear(), false);
         const parshaName = sedra.get(today);
 
         if (parshaName) {
-            // parshaName can be an array for double parshiot
             const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
             const parshaInfo = parshiot.find(p => p.name === parshaKey);
             if (parshaInfo) {
@@ -154,7 +150,6 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not determine current parsha from Hebcal:", e);
     }
     
-    // Final fallback to Bereshit or the first parsha available
     return parshiot.find(p => p.id === 'bereshit') || parshiot[0];
 }
 
@@ -236,7 +231,7 @@ function getStaticParshiotData() {
     return { chumashim, parshiot };
 }
 
-async function seedParshiotAndChumashim(): Promise<void> {
+export async function seedParshiotAndChumashim(): Promise<void> {
   try {
     console.log("Attempting to seed Chumashim and Parshiot...");
     const { firestore } = await initializeAdminApp();
@@ -256,11 +251,9 @@ async function seedParshiotAndChumashim(): Promise<void> {
 
     await batch.commit();
     console.log('Successfully seeded Chumashim and Parshiot.');
+    await revalidateInsightPaths();
   } catch (e) {
     console.error("Seeding failed:", e);
-    // We throw the error so the caller can decide how to handle it.
     throw e;
   }
 }
-
-    

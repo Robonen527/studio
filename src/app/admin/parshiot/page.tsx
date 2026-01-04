@@ -19,15 +19,50 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { revalidateInsightPaths } from '@/lib/actions';
+import { revalidateInsightPaths, seedParshiotAndChumashim } from '@/lib/actions';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { Database } from 'lucide-react';
 
 // Helper to create a URL-friendly slug
 const createSlug = (name: string) => {
     return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
+
+function SeedButton() {
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+    
+    const handleSeed = () => {
+        startTransition(async () => {
+            try {
+                await seedParshiotAndChumashim();
+                toast({
+                    title: "הצלחה",
+                    description: "מסד הנתונים אותחל בהצלחה עם רשימת הפרשות והחומשים. הרשימה תתעדכן בעוד מספר רגעים."
+                })
+                // Optionally, trigger a page reload or data re-fetch here
+                window.location.reload();
+            } catch(e) {
+                console.error(e);
+                toast({
+                    variant: "destructive",
+                    title: "שגיאה",
+                    description: "אירעה שגיאה בעת אתחול מסד הנתונים."
+                })
+            }
+        });
+    }
+
+    return (
+        <Button variant="secondary" onClick={handleSeed} disabled={isPending}>
+            {isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Database className="ml-2 h-4 w-4" />}
+            אתחול וזריעת נתונים
+        </Button>
+    )
+}
+
 
 function EditChumashDialog({ chumash, onFinished }: { chumash?: Chumash, onFinished: () => void }) {
     const [name, setName] = useState(chumash?.name || '');
@@ -179,6 +214,7 @@ export default function AdminParshiotPage() {
     };
     
     const isLoading = isUserLoading || isLoadingChumashim || isLoadingParshiot;
+    const isDataEmpty = !isLoading && (!chumashim || chumashim.length === 0);
 
     if (isLoading) {
         return (
@@ -207,10 +243,13 @@ export default function AdminParshiotPage() {
                         <h1 className="font-headline text-4xl md:text-5xl text-primary">ניהול פרשות וחומשים</h1>
                         <p className="mt-2 text-md text-muted-foreground">ערוך, הוסף ומחק חומשים ופרשות במערכת.</p>
                     </div>
-                    <Button onClick={() => setDialog({ type: 'chumash' })}>
-                        <Plus className="ml-2" />
-                        הוסף חומש
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {isDataEmpty && <SeedButton />}
+                        <Button onClick={() => setDialog({ type: 'chumash' })}>
+                            <Plus className="ml-2" />
+                            הוסף חומש
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-8">
@@ -263,5 +302,3 @@ export default function AdminParshiotPage() {
         </>
     );
 }
-
-    
