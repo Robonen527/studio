@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getParshaBySlug, getCurrentParsha } from "@/lib/actions";
+import { getCurrentParsha } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
