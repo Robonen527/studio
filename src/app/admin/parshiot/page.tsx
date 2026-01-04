@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { revalidateInsightPaths, seedParshiotAndChumashim } from '@/lib/actions';
+import { revalidateInsightPaths } from '@/lib/actions';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -91,14 +91,13 @@ function SeedButton() {
 
 function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: Chumash, totalChumashim: number, onFinished: () => void }) {
     const [name, setName] = useState(chumash?.name || '');
-    const [order, setOrder] = useState(chumash?.order || 0);
     const [isPending, startTransition] = useTransition();
     const firestore = useFirestore();
     const { toast } = useToast();
 
     const handleSubmit = () => {
         if (!name) {
-            toast({ variant: 'destructive', title: 'שם החומש חסר' });
+            toast({ variant: 'destructive', title: 'שם הקטגוריה חסר' });
             return;
         }
         startTransition(async () => {
@@ -110,16 +109,15 @@ function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: 
                 const dataToSave: Chumash = {
                     id,
                     name,
-                    // If editing, keep original order. If adding, set to be the last.
-                    order: isEditing ? order : totalChumashim + 1
+                    order: isEditing && chumash.order ? chumash.order : totalChumashim + 1
                 };
 
                 setDocumentNonBlocking(docRef, dataToSave, { merge: true });
                 await revalidateInsightPaths();
-                toast({ title: 'החומש נשמר בהצלחה' });
+                toast({ title: 'הקטגוריה נשמרה בהצלחה' });
                 onFinished();
             } catch (e) {
-                toast({ variant: 'destructive', title: 'שגיאה בשמירת החומש' });
+                toast({ variant: 'destructive', title: 'שגיאה בשמירת הקטגוריה' });
             }
         });
     };
@@ -127,19 +125,13 @@ function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: 
     return (
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>{chumash ? 'עריכת חומש' : 'הוספת חומש חדש'}</DialogTitle>
+                <DialogTitle>{chumash ? 'עריכת קטגוריה' : 'הוספת קטגוריה חדשה'}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="chumash-name" className="text-right">שם</Label>
                     <Input id="chumash-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
                 </div>
-                 {chumash && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="chumash-order" className="text-right">סדר</Label>
-                        <Input id="chumash-order" type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} className="col-span-3" />
-                    </div>
-                )}
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={onFinished}>ביטול</Button>
@@ -232,10 +224,10 @@ export default function AdminParshiotPage() {
     const handleDeleteChumash = (chumashId: string) => {
         if (!firestore) return;
         if (parshiotByChumashId[chumashId]?.length > 0) {
-            alert('לא ניתן למחוק חומש שיש בו פרשות.');
+            alert('לא ניתן למחוק קטגוריה שיש בה פרשות.');
             return;
         }
-        if (window.confirm('האם אתה בטוח שברצונך למחוק את החומש?')) {
+        if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
             const docRef = doc(firestore, 'chumashim', chumashId);
             deleteDocumentNonBlocking(docRef);
             revalidateInsightPaths();
@@ -278,14 +270,14 @@ export default function AdminParshiotPage() {
             <div className="container mx-auto px-4 py-8 md:py-12">
                 <div className="flex justify-between items-center mb-12">
                     <div>
-                        <h1 className="font-headline text-4xl md:text-5xl text-primary">ניהול פרשות וחומשים</h1>
-                        <p className="mt-2 text-md text-muted-foreground">ערוך, הוסף ומחק חומשים ופרשות במערכת.</p>
+                        <h1 className="font-headline text-4xl md:text-5xl text-primary">ניהול פרשות וקטגוריות</h1>
+                        <p className="mt-2 text-md text-muted-foreground">ערוך, הוסף ומחק קטגוריות ופרשות במערכת.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {isDataEmpty && <SeedButton />}
                         <Button onClick={() => setDialog({ type: 'chumash' })}>
                             <Plus className="ml-2" />
-                            הוסף חומש
+                            הוסף קטגוריה
                         </Button>
                     </div>
                 </div>
@@ -324,7 +316,7 @@ export default function AdminParshiotPage() {
                                         </div>
                                     ))}
                                     { (parshiotByChumashId[chumash.id] || []).length === 0 && (
-                                        <p className="text-sm text-muted-foreground col-span-full">אין פרשות לחומש זה.</p>
+                                        <p className="text-sm text-muted-foreground col-span-full">אין פרשות לקטגוריה זו.</p>
                                     )}
                                 </div>
                             </CardContent>

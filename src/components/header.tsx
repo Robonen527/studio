@@ -24,7 +24,7 @@ function AdminNav() {
     <Button variant="ghost" asChild>
       <Link href="/admin/parshiot">
         <BookKey className="ml-2" />
-        ניהול פרשות
+        ניהול קטגוריות
       </Link>
     </Button>
   );
