@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { getParshaBySlug, getParshiot } from "@/lib/actions";
+import { getParshaBySlug } from "@/lib/actions";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -58,9 +58,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
 
   const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   
-  const isLoading = isLoadingParsha || isLoadingInsights;
-
-  if (isLoading || !parsha) {
+  if (isLoadingParsha || !parsha) {
     return (
        <div className="container mx-auto px-4 py-8 md:py-12">
         <Skeleton className="h-12 w-1/3 mb-8" />
@@ -86,7 +84,12 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
         </div>
       </div>
 
-      {insights && insights.length > 0 ? (
+      {isLoadingInsights ? (
+        <div className="space-y-6">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : insights && insights.length > 0 ? (
         <div className="space-y-6">
           {insights.map((insight) => (
             <Card key={insight.id} className="shadow-md transition-shadow hover:shadow-lg">
