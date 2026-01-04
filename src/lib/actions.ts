@@ -7,7 +7,7 @@ import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
 import { doc, getDoc, collection, getDocs, orderBy, query as adminQuery } from "firebase-admin/firestore";
 
-async function isFirestoreEmpty(collectionName: string) {
+async function isFirestoreEmpty(collectionName: string): Promise<boolean> {
     const { firestore } = await initializeAdminApp();
     const collectionRef = collection(firestore, collectionName);
     const snapshot = await getDocs(collectionRef);
@@ -18,7 +18,6 @@ export async function getParshiot(): Promise<Parsha[]> {
   try {
     const { firestore } = await initializeAdminApp();
     
-    // This check might fail in dev, but it's a good first step
     if (await isFirestoreEmpty('parshiot')) {
         await seedParshiotAndChumashim();
     }
@@ -26,11 +25,8 @@ export async function getParshiot(): Promise<Parsha[]> {
     const parshiotRef = collection(firestore, 'parshiot');
     const snapshot = await getDocs(parshiotRef);
     if (snapshot.empty) {
-        // If still empty after trying to seed, something is wrong with access.
-        // Fallback to static data for now.
-        console.log("Firestore is empty or inaccessible, falling back to static data.");
-        const staticData = getStaticParshiotData();
-        return staticData.parshiot;
+        console.log("Firestore is empty even after seeding attempt, falling back to static data.");
+        return getStaticParshiotData().parshiot;
     }
     
     const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
@@ -41,17 +37,19 @@ export async function getParshiot(): Promise<Parsha[]> {
     parshiot.sort((a, b) => {
       const orderA = chumashOrderMap.get(a.chumashId) ?? 99;
       const orderB = chumashOrderMap.get(b.chumashId) ?? 99;
-      // This is a simplified sort, a more robust one would go by book and then internal order
-      return orderA - orderB;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      // If in the same chumash, we need a secondary sort order.
+      // For now, this is missing, but this structure allows it.
+      return a.name.localeCompare(b.name, 'he');
     });
 
     return parshiot;
 
   } catch (e) {
     console.error("Error in getParshiot, falling back to static data:", e);
-    // If there's any error, fall back to the static list.
-    const staticData = getStaticParshiotData();
-    return staticData.parshiot;
+    return getStaticParshiotData().parshiot;
   }
 }
 
@@ -63,7 +61,13 @@ export async function getChumashim(): Promise<Chumash[]> {
         const q = adminQuery(chumashimRef, orderBy('order'));
         const snapshot = await getDocs(q);
         if (snapshot.empty) {
-            return getStaticParshiotData().chumashim;
+            // Attempt to seed if empty
+            await seedParshiotAndChumashim();
+            const seededSnapshot = await getDocs(q);
+             if (seededSnapshot.empty) {
+                return getStaticParshiotData().chumashim;
+            }
+            return seededSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chumash));
         }
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chumash));
     } catch(e) {
@@ -84,7 +88,6 @@ export async function getParshiotWithChumash() {
     return acc;
   }, {} as Record<string, Parsha[]>);
   
-  // Sort chumashim by order
   const sortedChumashim = [...chumashim].sort((a, b) => a.order - b.order);
 
   return sortedChumashim.map(chumash => ({
@@ -99,15 +102,12 @@ export async function getParshaBySlug(slug: string): Promise<Parsha | null> {
       const docRef = doc(firestore, 'parshiot', slug);
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) {
-          // Fallback to static data if not found in DB
-          const staticParshiot = getStaticParshiotData().parshiot;
-          return staticParshiot.find(p => p.id === slug) || null;
+          return getStaticParshiotData().parshiot.find(p => p.id === slug) || null;
       }
       return { id: docSnap.id, ...docSnap.data() } as Parsha;
   } catch(e) {
      console.error(`Error getting parsha ${slug} from DB, falling back to static data`, e);
-     const staticParshiot = getStaticParshiotData().parshiot;
-     return staticParshiot.find(p => p.id === slug) || null;
+     return getStaticParshiotData().parshiot.find(p => p.id === slug) || null;
   }
 }
 
@@ -230,6 +230,7 @@ function getStaticParshiotData() {
 }
 
 async function seedParshiotAndChumashim(): Promise<void> {
+  try {
     console.log("Attempting to seed Chumashim and Parshiot...");
     const { firestore } = await initializeAdminApp();
     const batch = firestore.batch();
@@ -248,6 +249,13 @@ async function seedParshiotAndChumashim(): Promise<void> {
 
     await batch.commit();
     console.log('Successfully seeded Chumashim and Parshiot.');
+  } catch (e) {
+    console.error("Seeding failed:", e);
+    // We throw the error so the caller can decide how to handle it.
+    throw e;
+  }
 }
+
+    
 
     
