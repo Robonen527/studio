@@ -20,12 +20,12 @@ type ParshaDetailPageProps = {
 };
 
 export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
-  const { slug } = params;
   const [parsha, setParsha] = useState<Parsha | null>(null);
   const [isLoadingParsha, setIsLoadingParsha] = useState(true);
   const firestore = useFirestore();
 
   useEffect(() => {
+    const slug = params.slug;
     if (!slug) return;
     
     async function fetchParsha() {
@@ -47,7 +47,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
     }
     
     fetchParsha();
-  }, [slug]);
+  }, [params]);
 
   const insightsQuery = useMemoFirebase(() => 
     parsha ? query(
@@ -123,3 +123,4 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
     </div>
   );
 }
+
