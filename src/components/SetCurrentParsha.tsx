@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import {
@@ -20,11 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
-import { parshiot } from "@/lib/parshiot";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { doc } from "firebase/firestore";
 import { revalidateInsightPaths } from "@/lib/actions";
+import { getParshiot } from "@/lib/actions";
+import type { Parsha } from "@/lib/types";
 
 type SetCurrentParshaProps = {
   currentParshaSlug: string;
@@ -37,6 +38,15 @@ export function SetCurrentParsha({ currentParshaSlug }: SetCurrentParshaProps) {
   const [selectedSlug, setSelectedSlug] = useState(currentParshaSlug);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const [parshiot, setParshiot] = useState<Parsha[]>([]);
+  
+  useEffect(() => {
+    async function loadParshiot() {
+      const p = await getParshiot();
+      setParshiot(p);
+    }
+    loadParshiot();
+  }, [])
   
   const isAdmin = !!user;
 
@@ -52,14 +62,12 @@ export function SetCurrentParsha({ currentParshaSlug }: SetCurrentParshaProps) {
         const settingsRef = doc(firestore, 'settings', 'currentParsha');
         setDocumentNonBlocking(settingsRef, { slug: selectedSlug }, { merge: false });
         
-        // Optimistically revalidate and close
         revalidateInsightPaths(selectedSlug).then(() => {
             toast({
               title: "הצלחה",
               description: "פרשת השבוע עודכנה. השינוי יתעדכן בדף בעוד מספר רגעים.",
             });
             setIsOpen(false);
-            // Optional: force a reload if revalidation is not immediate enough
             window.location.reload();
         });
 
@@ -94,7 +102,7 @@ export function SetCurrentParsha({ currentParshaSlug }: SetCurrentParshaProps) {
                 </SelectTrigger>
                 <SelectContent>
                     {parshiot.map(parsha => (
-                        <SelectItem key={parsha.slug} value={parsha.slug}>
+                        <SelectItem key={parsha.id} value={parsha.id}>
                             {parsha.name}
                         </SelectItem>
                     ))}

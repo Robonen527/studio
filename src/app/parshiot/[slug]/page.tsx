@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { getParshaBySlug } from "@/lib/actions";
+import { getParshaBySlug, getParshiot } from "@/lib/actions";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { parshiot } from '@/lib/parshiot';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 type ParshaDetailPageProps = {
@@ -26,8 +25,16 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   const [parsha, setParsha] = useState<Parsha | null>(null);
   const [slug, setSlug] = useState('');
   const firestore = useFirestore();
-
+  const [parshiot, setParshiot] = useState<Parsha[]>([]);
   const [parshaIndex, setParshaIndex] = useState(-1);
+
+  useEffect(() => {
+    async function loadParshiot() {
+        const p = await getParshiot();
+        setParshiot(p);
+    }
+    loadParshiot();
+  }, []);
 
   useEffect(() => {
     if (params.slug) {
@@ -46,16 +53,18 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
       setParsha(p);
       if(p) {
         document.title = `פרשת ${p.name} | מאיר בפרשה`;
-        const currentIndex = parshiot.findIndex(parsha => parsha.slug === p.slug);
-        setParshaIndex(currentIndex);
+        if (parshiot.length > 0) {
+            const currentIndex = parshiot.findIndex(parsha => parsha.id === p.id);
+            setParshaIndex(currentIndex);
+        }
       }
     }
     fetchParsha();
-  }, [slug]);
+  }, [slug, parshiot]);
 
   const insightsQuery = useMemoFirebase(() => 
     parsha ? query(
-      collection(firestore, `parshiot/${parsha.slug}/torahInsights`),
+      collection(firestore, `parshiot/${parsha.id}/torahInsights`),
       orderBy("createdAt", "desc")
     ) : null,
   [firestore, parsha]);
@@ -63,7 +72,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   const { data: insights, isLoading } = useCollection<Insight>(insightsQuery);
 
   const prevParsha = parshaIndex > 0 ? parshiot[parshaIndex - 1] : null;
-  const nextParsha = parshaIndex < parshiot.length - 1 ? parshiot[parshaIndex + 1] : null;
+  const nextParsha = parshaIndex !== -1 && parshaIndex < parshiot.length - 1 ? parshiot[parshaIndex + 1] : null;
 
   if (!parsha) {
     return (
@@ -83,7 +92,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
       <div className="flex justify-between items-center mb-4">
         {prevParsha ? (
            <Button asChild variant="outline">
-            <Link href={`/parshiot/${prevParsha.slug}`}>
+            <Link href={`/parshiot/${prevParsha.id}`}>
               <ArrowRight className="ml-2 h-4 w-4" />
                <span className="hidden md:inline">לפרשה הקודמת: {prevParsha.name}</span>
                <span className="md:hidden">הקודם</span>
@@ -92,7 +101,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
         ) : <div />}
         {nextParsha ? (
           <Button asChild variant="outline">
-            <Link href={`/parshiot/${nextParsha.slug}`}>
+            <Link href={`/parshiot/${nextParsha.id}`}>
               <span className="hidden md:inline">לפרשה הבאה: {nextParsha.name}</span>
               <span className="md:hidden">הבא</span>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -131,7 +140,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
                     </div>
                     <div className="flex gap-1 md:gap-2">
                         <EditInsightButton insight={insight} />
-                        <DeleteInsightButton parshaSlug={parsha.slug} insightId={insight.id} />
+                        <DeleteInsightButton parshaSlug={parsha.id} insightId={insight.id} />
                     </div>
                 </div>
               </CardHeader>

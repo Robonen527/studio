@@ -1,6 +1,13 @@
 export type Parsha = {
-  slug: string;
+  id: string; // slug is the id
   name: string;
+  chumashId: string;
+};
+
+export type Chumash = {
+  id: string;
+  name: string;
+  order: number;
 };
 
 export type Insight = {

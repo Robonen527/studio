@@ -45,7 +45,7 @@ export function AddInsightButton({ parsha, isPrimary = false }: AddInsightButton
               מלא את הפרטים הבאים כדי להוסיף דבר תורה לפרשת {parsha.name}.
             </DialogDescription>
           </DialogHeader>
-          <InsightForm parsha={parsha} onFinished={() => setIsOpen(false)} />
+          <InsightForm parshaSlug={parsha.id} parshaName={parsha.name} onFinished={() => setIsOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

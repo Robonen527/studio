@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getParshaBySlug } from "@/lib/actions";
+import { getParshaBySlug, getCurrentParsha } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -12,62 +12,25 @@ import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
-import { HDate, Sedra } from 'hebcal';
 import { DownloadInsightsButton } from '@/components/download-insights-button';
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
   const firestore = useFirestore();
   
-  // 1. Fetch the manually set parsha from Firestore
-  const settingsDocRef = useMemoFirebase(() => doc(firestore, 'settings/currentParsha'), [firestore]);
-  const { data: manualParshaSetting, isLoading: isLoadingManualParsha } = useDoc<{ slug: string }>(settingsDocRef);
-
-  // 2. Fetch the date-based parsha as a fallback
-  const [dateBasedParsha, setDateBasedParsha] = useState<Parsha | null>(null);
+  // This combines fetching manual and date-based parsha
   useEffect(() => {
-    async function fetchParshaByDate() {
-        try {
-            const today = new HDate();
-            const sedra = new Sedra(today.getFullYear(), false);
-            const parshaName = sedra.get(today);
-            if (parshaName) {
-                const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
-                const parshaInfo = await getParshaBySlug(parshaKey.toLowerCase().replace(/ /g, '-'));
-                if (parshaInfo) {
-                  setDateBasedParsha(parshaInfo);
-                  return;
-                }
-            }
-        } catch (e) {
-            console.error("Could not determine current parsha from Hebcal:", e);
-        }
-        // Fallback
-        const defaultParsha = await getParshaBySlug('bereshit');
-        setDateBasedParsha(defaultParsha);
+    async function fetchCurrentParsha() {
+      const parsha = await getCurrentParsha();
+      setCurrentParsha(parsha);
     }
-    fetchParshaByDate();
+    fetchCurrentParsha();
   }, []);
-
-  // 3. Determine the definitive current parsha
-  useEffect(() => {
-    async function determineParsha() {
-      if (isLoadingManualParsha) return; // Wait until we know if there's a manual setting
-
-      if (manualParshaSetting?.slug) {
-        const parsha = await getParshaBySlug(manualParshaSetting.slug);
-        setCurrentParsha(parsha);
-      } else {
-        setCurrentParsha(dateBasedParsha);
-      }
-    }
-    determineParsha();
-  }, [manualParshaSetting, dateBasedParsha, isLoadingManualParsha]);
 
 
   const insightsQuery = useMemoFirebase(() => 
     currentParsha ? query(
-      collection(firestore, `parshiot/${currentParsha.slug}/torahInsights`),
+      collection(firestore, `parshiot/${currentParsha.id}/torahInsights`),
       orderBy("createdAt", "desc"),
       limit(1)
     ) : null,
@@ -106,7 +69,7 @@ export default function Home() {
           <CardTitle className="font-headline text-2xl md:text-4xl text-primary flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2">
               <span>פרשת השבוע: {currentParsha.name}</span>
-              <SetCurrentParsha currentParshaSlug={currentParsha.slug} />
+              <SetCurrentParsha currentParshaSlug={currentParsha.id} />
             </div>
             <div className="self-start sm:self-center">
               <AddInsightButton parsha={currentParsha} />
@@ -133,7 +96,7 @@ export default function Home() {
 
               <div className="flex justify-center pt-4">
                 <Button asChild variant="outline">
-                  <Link href={`/parshiot/${currentParsha.slug}`}>לכל דברי התורה על פרשת {currentParsha.name}</Link>
+                  <Link href={`/parshiot/${currentParsha.id}`}>לכל דברי התורה על פרשת {currentParsha.name}</Link>
                 </Button>
               </div>
             </div>

@@ -2,35 +2,85 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { parshiot } from "./parshiot";
-import type { Insight, Parsha } from "./types";
+import type { Chumash, Insight, Parsha } from "./types";
 import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
 import { doc, getDoc, collection, getDocs, orderBy, query as adminQuery } from "firebase-admin/firestore";
 
+export async function getParshiot(): Promise<Parsha[]> {
+  try {
+    const { firestore } = await initializeAdminApp();
+    const parshiotRef = collection(firestore, 'parshiot');
+    const snapshot = await getDocs(parshiotRef);
+    if (snapshot.empty) {
+      console.log('No parshiot found in Firestore. Seeding now.');
+      return await seedParshiotAndChumashim();
+    }
+    const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
+    
+    // We need to get the chumash order to sort the parshiot correctly
+    const chumashim = await getChumashim();
+    const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
-export async function getParshiot() {
-  return parshiot;
+    parshiot.sort((a, b) => {
+      const orderA = chumashOrderMap.get(a.chumashId) ?? 99;
+      const orderB = chumashOrderMap.get(b.chumashId) ?? 99;
+      return orderA - orderB;
+    });
+
+    return parshiot;
+
+  } catch (e) {
+    console.error("Error in getParshiot:", e);
+    // Fallback to seeding if there's an error, as this might be a first-run scenario.
+    return await seedParshiotAndChumashim();
+  }
+}
+
+export async function getChumashim(): Promise<Chumash[]> {
+    const { firestore } = await initializeAdminApp();
+    const chumashimRef = collection(firestore, 'chumashim');
+    const q = adminQuery(chumashimRef, orderBy('order'));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+        return []; // Should be seeded by getParshiot
+    }
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chumash));
 }
 
 export async function getParshiotWithChumash() {
-  const chumashim: { name: string; parshiot: Parsha[] }[] = [
-    { name: 'בראשית', parshiot: parshiot.slice(0, 12) },
-    { name: 'שמות', parshiot: parshiot.slice(12, 23) },
-    { name: 'ויקרא', parshiot: parshiot.slice(23, 33) },
-    { name: 'במדבר', parshiot: parshiot.slice(33, 43) },
-    { name: 'דברים', parshiot: parshiot.slice(43) },
-  ];
+  const parshiot = await getParshiot();
+  const chumashim = await getChumashim();
 
-  return chumashim;
+  const parshiotByChumashId = parshiot.reduce((acc, parsha) => {
+    if (!acc[parsha.chumashId]) {
+      acc[parsha.chumashId] = [];
+    }
+    acc[parsha.chumashId].push(parsha);
+    return acc;
+  }, {} as Record<string, Parsha[]>);
+
+  return chumashim.map(chumash => ({
+    ...chumash,
+    parshiot: parshiotByChumashId[chumash.id] || []
+  }));
 }
 
 export async function getParshaBySlug(slug: string): Promise<Parsha | null> {
-  const parsha = parshiot.find((p) => p.slug === slug);
-  return parsha ? { ...parsha } : null;
+  const { firestore } = await initializeAdminApp();
+  const docRef = doc(firestore, 'parshiot', slug);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    return null;
+  }
+  return { id: docSnap.id, ...docSnap.data() } as Parsha;
 }
 
-export async function getCurrentParsha(): Promise<Parsha> {
+
+export async function getCurrentParsha(): Promise<Parsha | null> {
+    const parshiot = await getParshiot();
+    if (!parshiot || parshiot.length === 0) return null;
+    
     // This function will now primarily be for date-based calculation,
     // as the manual override is handled client-side on the homepage.
     try {
@@ -68,11 +118,104 @@ export async function getCurrentParsha(): Promise<Parsha> {
     }
     
     // Fallback to a default if all else fails
-    return parshiot.find(p => p.slug === 'bereshit') || parshiot[0];
+    return parshiot.find(p => p.id === 'bereshit') || parshiot[0];
 }
 
-export async function revalidateInsightPaths(parshaSlug: string) {
+
+export async function revalidateInsightPaths(parshaSlug?: string) {
   revalidatePath("/");
-  revalidatePath(`/parshiot/${parshaSlug}`);
+  if(parshaSlug) {
+    revalidatePath(`/parshiot/${parshaSlug}`);
+  }
   revalidatePath("/parshiot");
+  revalidatePath("/admin/parshiot");
+}
+
+async function seedParshiotAndChumashim(): Promise<Parsha[]> {
+    const { firestore } = await initializeAdminApp();
+    const batch = firestore.batch();
+
+    const chumashimData: Omit<Chumash, 'id'>[] = [
+        { name: 'בראשית', order: 1 },
+        { name: 'שמות', order: 2 },
+        { name: 'ויקרא', order: 3 },
+        { name: 'במדבר', order: 4 },
+        { name: 'דברים', order: 5 },
+    ];
+
+    const chumashIds = ['genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy'];
+
+    chumashimData.forEach((chumash, index) => {
+        const chumashId = chumashIds[index];
+        const chumashRef = doc(firestore, 'chumashim', chumashId);
+        batch.set(chumashRef, chumash);
+    });
+
+    const parshiotData: { slug: string; name: string, chumashIndex: number }[] = [
+      { slug: 'bereshit', name: 'בראשית', chumashIndex: 0 },
+      { slug: 'noach', name: 'נח', chumashIndex: 0 },
+      { slug: 'lech-lecha', name: 'לך-לך', chumashIndex: 0 },
+      { slug: 'vayeira', name: 'וירא', chumashIndex: 0 },
+      { slug: 'chayei-sarah', name: 'חיי שרה', chumashIndex: 0 },
+      { slug: 'toldot', name: 'תולדות', chumashIndex: 0 },
+      { slug: 'vayetzei', name: 'ויצא', chumashIndex: 0 },
+      { slug: 'vayishlach', name: 'וישלח', chumashIndex: 0 },
+      { slug: 'vayeshev', name: 'וישב', chumashIndex: 0 },
+      { slug: 'miketz', name: 'מקץ', chumashIndex: 0 },
+      { slug: 'vayigash', name: 'ויגש', chumashIndex: 0 },
+      { slug: 'vayechi', name: 'ויחי', chumashIndex: 0 },
+      { slug: 'shemot', name: 'שמות', chumashIndex: 1 },
+      { slug: 'vaera', name: 'וארא', chumashIndex: 1 },
+      { slug: 'bo', name: 'בא', chumashIndex: 1 },
+      { slug: 'beshalach', name: 'בשלח', chumashIndex: 1 },
+      { slug: 'yitro', name: 'יתרו', chumashIndex: 1 },
+      { slug: 'mishpatim', name: 'משפטים', chumashIndex: 1 },
+      { slug: 'terumah', name: 'תרומה', chumashIndex: 1 },
+      { slug: 'tetzaveh', name: 'תצוה', chumashIndex: 1 },
+      { slug: 'ki-tisa', name: 'כי תשא', chumashIndex: 1 },
+      { slug: 'vayakhel', name: 'ויקהל', chumashIndex: 1 },
+      { slug: 'pekudei', name: 'פקודי', chumashIndex: 1 },
+      { slug: 'vayikra', name: 'ויקרא', chumashIndex: 2 },
+      { slug: 'tzav', name: 'צו', chumashIndex: 2 },
+      { slug: 'shmini', name: 'שמיני', chumashIndex: 2 },
+      { slug: 'tazria', name: 'תזריע', chumashIndex: 2 },
+      { slug: 'metzora', name: 'מצורע', chumashIndex: 2 },
+      { slug: 'acharei-mot', name: 'אחרי מות', chumashIndex: 2 },
+      { slug: 'kedoshim', name: 'קדושים', chumashIndex: 2 },
+      { slug: 'emor', name: 'אמור', chumashIndex: 2 },
+      { slug: 'behar', name: 'בהר', chumashIndex: 2 },
+      { slug: 'bechukotai', name: 'בחוקותי', chumashIndex: 2 },
+      { slug: 'bamidbar', name: 'במדבר', chumashIndex: 3 },
+      { slug: 'naso', name: 'נשא', chumashIndex: 3 },
+      { slug: 'behaalotcha', name: 'בהעלותך', chumashIndex: 3 },
+      { slug: 'shlach', name: 'שלח', chumashIndex: 3 },
+      { slug: 'korach', name: 'קרח', chumashIndex: 3 },
+      { slug: 'chukat', name: 'חקת', chumashIndex: 3 },
+      { slug: 'balak', name: 'בלק', chumashIndex: 3 },
+      { slug: 'pinchas', name: 'פינחס', chumashIndex: 3 },
+      { slug: 'matot', name: 'מטות', chumashIndex: 3 },
+      { slug: 'masei', name: 'מסעי', chumashIndex: 3 },
+      { slug: 'devarim', name: 'דברים', chumashIndex: 4 },
+      { slug: 'vaetchanan', name: 'ואתחנן', chumashIndex: 4 },
+      { slug: 'eikev', name: 'עקב', chumashIndex: 4 },
+      { slug: 'reeh', name: 'ראה', chumashIndex: 4 },
+      { slug: 'shoftim', name: 'שופטים', chumashIndex: 4 },
+      { slug: 'ki-tetzei', name: 'כי תצא', chumashIndex: 4 },
+      { slug: 'ki-tavo', name: 'כי תבוא', chumashIndex: 4 },
+      { slug: 'nitzavim', name: 'ניצבים', chumashIndex: 4 },
+      { slug: 'vayelech', name: 'וילך', chumashIndex: 4 },
+      { slug: 'haazinu', name: 'האזינו', chumashIndex: 4 },
+      { slug: 'vezot-haberakhah', name: 'וזאת הברכה', chumashIndex: 4 },
+    ];
+    
+    const finalParshiot: Parsha[] = parshiotData.map(p => {
+        const parshaRef = doc(firestore, 'parshiot', p.slug);
+        const parshaDoc = { name: p.name, chumashId: chumashIds[p.chumashIndex] };
+        batch.set(parshaRef, parshaDoc);
+        return { id: p.slug, ...parshaDoc };
+    });
+
+    await batch.commit();
+    console.log('Successfully seeded Chumashim and Parshiot.');
+    return finalParshiot;
 }

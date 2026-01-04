@@ -3,6 +3,7 @@
  * Core Philosophy: This ruleset establishes a public, read-only content model with writes restricted to a specific set of administrators. The primary goal is to allow anyone, authenticated or not, to read Torah insights, while ensuring that only trusted admin users can create, modify, or delete content.
  *
  * Data Structure:
+ * - /chumashim/{chumashId}: Contains the book of the Torah.
  * - /parshiot/{parshaId}: A top-level collection containing metadata for each Torah portion.
  * - /parshiot/{parshaId}/torahInsights/{insightId}: A subcollection containing the actual Torah insights for a given portion.
  * - /roles_admin/{userId}: A dedicated collection for authorization. The existence of a document here, where the document ID is a user's UID, grants that user admin privileges across the database.
@@ -46,7 +47,7 @@ service cloud.firestore {
     }
 
     /**
-     * Validates that the parshaId in a new TorahInsight document's data matches the parshaId from the URL path.
+     * Validates that the parshaSlug in a new TorahInsight document's data matches the parshaId from the URL path.
      * This enforces relational integrity at the point of creation.
      */
     function hasValidTorahInsightDataOnCreate(parshaId) {
@@ -54,7 +55,7 @@ service cloud.firestore {
     }
 
     /**
-     * Enforces that the parshaId field within a TorahInsight document is immutable and cannot be changed after creation.
+     * Enforces that the parshaSlug field within a TorahInsight document is immutable and cannot be changed after creation.
      * This protects the document's relationship to its parent Parsha.
      */
     function isTorahInsightParentImmutableOnUpdate() {
@@ -62,17 +63,24 @@ service cloud.firestore {
     }
 
     /**
+     * @description Rules for the Chumashim collection.
+     * @allow (read) Any user can read the list of Chumashim.
+     * @allow (write) Only admins can create, update, or delete Chumashim.
+     */
+    match /chumashim/{chumashId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    /**
      * @description Rules for the Parshiot collection, which stores metadata for each Torah portion.
      * @path /parshiot/{parshaId}
-     * @allow (get) Any user, signed in or not, can read a Parsha document.
-     * @deny (create) A non-admin user cannot create a new Parsha document.
-     * @principle Public read with role-based writes. Content is open for consumption, but modification is restricted to trusted admins.
+     * @allow (read) Any user, signed in or not, can read a Parsha document.
+     * @allow (write) Only admins can create, update, or delete Parsha documents.
      */
     match /parshiot/{parshaId} {
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isExistingDocAdmin();
-      allow delete: if isExistingDocAdmin();
+      allow write: if isAdmin();
 
       /**
        * @description Rules for Torah Insights, which are nested under their respective Parsha.
