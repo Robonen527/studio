@@ -1,14 +1,13 @@
 
 "use client";
 import { useState, useEffect } from 'react';
-import { getParshaBySlug } from "@/lib/actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
 import { EditInsightButton } from "@/components/edit-insight-button";
 import { DeleteInsightButton } from "@/components/delete-insight-button";
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -19,35 +18,22 @@ type ParshaDetailPageProps = {
 };
 
 export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
-  const [parsha, setParsha] = useState<Parsha | null>(null);
-  const [isLoadingParsha, setIsLoadingParsha] = useState(true);
   const firestore = useFirestore();
 
+  // Use useDoc to fetch the parsha data in real-time
+  const parshaDocRef = useMemoFirebase(() => {
+    if (!firestore || !params.slug) return null;
+    return doc(firestore, 'parshiot', params.slug);
+  }, [firestore, params.slug]);
+
+  const { data: parsha, isLoading: isLoadingParsha, error: parshaError } = useDoc<Parsha>(parshaDocRef);
+
   useEffect(() => {
-    const slug = params.slug;
-    if (!slug) {
-        setIsLoadingParsha(false);
-        return;
-    };
-    
-    async function fetchParsha() {
-      setIsLoadingParsha(true);
-      try {
-        const p = await getParshaBySlug(slug);
-        setParsha(p); // Will be null if not found
-        if (p) {
-          document.title = `פרשת ${p.name} | מאיר בפרשה`;
-        }
-      } catch (error) {
-        console.error("Failed to fetch parsha", error);
-        setParsha(null);
-      } finally {
-        setIsLoadingParsha(false);
-      }
+    if (parsha) {
+        document.title = `פרשת ${parsha.name} | מאיר בפרשה`;
     }
-    
-    fetchParsha();
-  }, [params]);
+  }, [parsha]);
+
 
   const insightsQuery = useMemoFirebase(() => 
     parsha ? query(
