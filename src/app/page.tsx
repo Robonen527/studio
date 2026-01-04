@@ -2,31 +2,59 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getCurrentParsha } from "@/lib/actions";
+import { getCurrentParsha as getParshaByDate, getParshaBySlug } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetCurrentParsha } from '@/components/SetCurrentParsha';
 
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
-  const firestore = useFirestore();
   const [isLoadingParsha, setIsLoadingParsha] = useState(true);
-  
+  const firestore = useFirestore();
+
+  // 1. Fetch the manually set parsha from Firestore
+  const settingsDocRef = useMemoFirebase(() => doc(firestore, 'settings/currentParsha'), [firestore]);
+  const { data: manualParshaSetting, isLoading: isLoadingManualParsha } = useDoc<{ slug: string }>(settingsDocRef);
+
+  // 2. Fetch the date-based parsha as a fallback
+  const [dateBasedParsha, setDateBasedParsha] = useState<Parsha | null>(null);
   useEffect(() => {
-    async function fetchCurrentParsha() {
+    async function fetchParshaByDate() {
+      const parsha = await getParshaByDate();
+      setDateBasedParsha(parsha);
+    }
+    fetchParshaByDate();
+  }, []);
+
+  // 3. Determine the definitive current parsha
+  useEffect(() => {
+    async function determineParsha() {
+      // Wait until we have info from both manual setting and date-based calculation
+      if (isLoadingManualParsha || !dateBasedParsha) return;
+
       setIsLoadingParsha(true);
-      const parsha = await getCurrentParsha();
-      setCurrentParsha(parsha);
+      let finalParsha: Parsha | null = null;
+      
+      // Prefer the manually set parsha if it exists
+      if (manualParshaSetting?.slug) {
+        const parsha = await getParshaBySlug(manualParshaSetting.slug);
+        finalParsha = parsha;
+      } else {
+        // Fallback to the parsha based on the current date
+        finalParsha = dateBasedParsha;
+      }
+      
+      setCurrentParsha(finalParsha);
       setIsLoadingParsha(false);
     }
-    fetchCurrentParsha();
-  }, []);
+    determineParsha();
+  }, [manualParshaSetting, dateBasedParsha, isLoadingManualParsha]);
 
 
   const insightsQuery = useMemoFirebase(() => 
@@ -41,9 +69,9 @@ export default function Home() {
   const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   const latestInsight = insights?.[0];
 
-  const isLoading = isLoadingParsha || !currentParsha;
+  const isLoading = isLoadingParsha || (isLoadingManualParsha && !currentParsha);
 
-  if (isLoading) {
+  if (isLoading || !currentParsha) {
     return (
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="flex flex-col items-center text-center mb-12">
