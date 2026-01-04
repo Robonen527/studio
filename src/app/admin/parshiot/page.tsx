@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useTransition, useMemo } from 'react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
 import type { Chumash, Parsha } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
@@ -24,6 +23,7 @@ import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { Database } from 'lucide-react';
+import { getStaticParshiotData } from '@/lib/static-data';
 
 // Helper to create a URL-friendly slug
 const createSlug = (name: string) => {
@@ -33,17 +33,42 @@ const createSlug = (name: string) => {
 function SeedButton() {
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
+    const firestore = useFirestore();
     
     const handleSeed = () => {
+        if (!firestore) {
+            toast({ variant: "destructive", title: "שגיאה", description: "שירות מסד הנתונים אינו זמין." });
+            return;
+        }
+
         startTransition(async () => {
             try {
+                const batch = writeBatch(firestore);
+                const { chumashim, parshiot } = getStaticParshiotData();
+                
+                chumashim.forEach(chumash => {
+                    const chumashRef = doc(firestore, 'chumashim', chumash.id);
+                    batch.set(chumashRef, chumash);
+                });
+
+                parshiot.forEach(parsha => {
+                    const parshaRef = doc(firestore, 'parshiot', parsha.id);
+                    batch.set(parshaRef, parsha);
+                });
+                
+                await batch.commit();
+
+                // Call the server action to revalidate paths
                 await seedParshiotAndChumashim();
+
                 toast({
                     title: "הצלחה",
-                    description: "מסד הנתונים אותחל בהצלחה עם רשימת הפרשות והחומשים. הרשימה תתעדכן בעוד מספר רגעים."
-                })
-                // Optionally, trigger a page reload or data re-fetch here
+                    description: "מסד הנתונים אותחל בהצלחה. רענן את הדף כדי לראות את הנתונים."
+                });
+
+                // Optionally trigger a page reload
                 window.location.reload();
+
             } catch(e) {
                 console.error(e);
                 toast({
@@ -170,10 +195,10 @@ export default function AdminParshiotPage() {
     const firestore = useFirestore();
     const [dialog, setDialog] = useState<{ type: 'chumash' | 'parsha'; payload?: any } | null>(null);
 
-    const chumashimQuery = useMemoFirebase(() => query(collection(firestore, 'chumashim'), orderBy('order')), [firestore]);
+    const chumashimQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'chumashim'), orderBy('order')) : null, [firestore]);
     const { data: chumashim, isLoading: isLoadingChumashim } = useCollection<Chumash>(chumashimQuery);
 
-    const parshiotQuery = useMemoFirebase(() => collection(firestore, 'parshiot'), [firestore]);
+    const parshiotQuery = useMemoFirebase(() => firestore ? collection(firestore, 'parshiot') : null, [firestore]);
     const { data: parshiot, isLoading: isLoadingParshiot } = useCollection<Parsha>(parshiotQuery);
 
     useEffect(() => {
@@ -194,6 +219,7 @@ export default function AdminParshiotPage() {
     }, [parshiot]);
 
     const handleDeleteChumash = (chumashId: string) => {
+        if (!firestore) return;
         if (parshiotByChumashId[chumashId]?.length > 0) {
             alert('לא ניתן למחוק חומש שיש בו פרשות.');
             return;
@@ -206,6 +232,7 @@ export default function AdminParshiotPage() {
     };
 
     const handleDeleteParsha = (parshaId: string) => {
+        if (!firestore) return;
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הפרשה? פעולה זו תמחק גם את כל דברי התורה המשויכים אליה.')) {
             const docRef = doc(firestore, 'parshiot', parshaId);
             deleteDocumentNonBlocking(docRef);
