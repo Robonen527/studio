@@ -2,7 +2,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { getParshaBySlug } from "@/lib/actions";
-import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
@@ -26,21 +25,22 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
 
   useEffect(() => {
     const slug = params.slug;
-    if (!slug) return;
+    if (!slug) {
+        setIsLoadingParsha(false);
+        return;
+    };
     
     async function fetchParsha() {
       setIsLoadingParsha(true);
       try {
         const p = await getParshaBySlug(slug);
-        if (!p) {
-          notFound();
-        } else {
-          setParsha(p);
+        setParsha(p); // Will be null if not found
+        if (p) {
           document.title = `פרשת ${p.name} | מאיר בפרשה`;
         }
       } catch (error) {
         console.error("Failed to fetch parsha", error);
-        notFound();
+        setParsha(null);
       } finally {
         setIsLoadingParsha(false);
       }
@@ -58,7 +58,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
 
   const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   
-  if (isLoadingParsha || !parsha) {
+  if (isLoadingParsha) {
     return (
        <div className="container mx-auto px-4 py-8 md:py-12">
         <Skeleton className="h-12 w-1/3 mb-8" />
@@ -68,6 +68,18 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
         </div>
       </div>
     )
+  }
+
+  if (!parsha) {
+    return (
+      <div className="container mx-auto px-4 py-8 md:py-12 text-center">
+        <h1 className="font-headline text-3xl md:text-5xl text-destructive">הפרשה לא נמצאה</h1>
+        <p className="mt-4 text-lg text-muted-foreground">יתכן שהקישור שגוי או שהפרשה נמחקה.</p>
+        <Link href="/parshiot" className="mt-6 inline-block bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 transition-colors">
+            חזרה לכל הפרשות
+          </Link>
+      </div>
+    );
   }
 
   return (
