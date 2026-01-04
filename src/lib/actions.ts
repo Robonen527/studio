@@ -18,6 +18,7 @@ export async function getParshiot(): Promise<Parsha[]> {
   try {
     const { firestore } = await initializeAdminApp();
     
+    // Check if the DB is empty and seed it if needed. This is more robust.
     if (await isFirestoreEmpty('parshiot')) {
         await seedParshiotAndChumashim();
     }
@@ -34,6 +35,7 @@ export async function getParshiot(): Promise<Parsha[]> {
     const chumashim = await getChumashim();
     const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
+    // Sort parshiot based on chumash order
     parshiot.sort((a, b) => {
       const orderA = chumashOrderMap.get(a.chumashId) ?? 99;
       const orderB = chumashOrderMap.get(b.chumashId) ?? 99;
@@ -65,6 +67,7 @@ export async function getChumashim(): Promise<Chumash[]> {
             await seedParshiotAndChumashim();
             const seededSnapshot = await getDocs(q);
              if (seededSnapshot.empty) {
+                console.warn("Chumashim collection is empty even after seeding, returning static data.");
                 return getStaticParshiotData().chumashim;
             }
             return seededSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chumash));
@@ -102,6 +105,7 @@ export async function getParshaBySlug(slug: string): Promise<Parsha | null> {
       const docRef = doc(firestore, 'parshiot', slug);
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) {
+          console.warn(`Parsha with slug ${slug} not found in DB, falling back to static.`);
           return getStaticParshiotData().parshiot.find(p => p.id === slug) || null;
       }
       return { id: docSnap.id, ...docSnap.data() } as Parsha;
@@ -132,12 +136,14 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not fetch manual parsha override from server:", e);
     }
     
+    // Fallback to date-based calculation
     try {
         const today = new HDate();
         const sedra = new Sedra(today.getFullYear(), false);
         const parshaName = sedra.get(today);
 
         if (parshaName) {
+            // parshaName can be an array for double parshiot
             const parshaKey = Array.isArray(parshaName) ? parshaName[0] : parshaName;
             const parshaInfo = parshiot.find(p => p.name === parshaKey);
             if (parshaInfo) {
@@ -148,6 +154,7 @@ export async function getCurrentParsha(): Promise<Parsha | null> {
         console.error("Could not determine current parsha from Hebcal:", e);
     }
     
+    // Final fallback to Bereshit or the first parsha available
     return parshiot.find(p => p.id === 'bereshit') || parshiot[0];
 }
 
@@ -220,7 +227,7 @@ function getStaticParshiotData() {
       { id: 'reeh', name: 'ראה', chumashId: 'deuteronomy' },
       { id: 'shoftim', name: 'שופטים', chumashId: 'deuteronomy' },
       { id: 'ki-tetzei', name: 'כי תצא', chumashId: 'deuteronomy' },
-      { id: 'ki-tavo', name: 'כי תבוא', chumashId: 'deuteronomy' },
+      { id: 'ki-tavo', 'name': 'כי תבוא', chumashId: 'deuteronomy' },
       { id: 'nitzavim', name: 'ניצבים', chumashId: 'deuteronomy' },
       { id: 'vayelech', name: 'וילך', chumashId: 'deuteronomy' },
       { id: 'haazinu', name: 'האזינו', chumashId: 'deuteronomy' },
@@ -255,6 +262,8 @@ async function seedParshiotAndChumashim(): Promise<void> {
     throw e;
   }
 }
+
+    
 
     
 
