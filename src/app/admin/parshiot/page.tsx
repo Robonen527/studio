@@ -28,8 +28,19 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 // Helper to create a URL-friendly slug
 const createSlug = (name: string) => {
-    return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // Basic transliteration for Hebrew characters
+    const hebrewMap: { [key: string]: string } = {
+        'א': 'a', 'ב': 'b', 'ג': 'g', 'ד': 'd', 'ה': 'h', 'ו': 'v', 'ז': 'z', 'ח': 'h',
+        'ט': 't', 'י': 'y', 'כ': 'k', 'ל': 'l', 'מ': 'm', 'נ': 'n', 'ס': 's', 'ע': 'a',
+        'פ': 'p', 'צ': 'ts', 'ק': 'k', 'ר': 'r', 'ש': 'sh', 'ת': 't',
+        'ך': 'k', 'ם': 'm', 'ן': 'n', 'ף': 'p', 'ץ': 'ts'
+    };
+
+    let slug = name.trim().toLowerCase();
+    slug = slug.split('').map(char => hebrewMap[char] || char).join('');
+    return slug.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
+
 
 function SeedButton() {
     const [isPending, startTransition] = useTransition();
@@ -111,7 +122,7 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
             try {
                 const isEditing = !!category;
                 const id = isEditing ? category.id : createSlug(name);
-                if (!id) {
+                 if (!id) {
                      toast({ variant: 'destructive', title: 'מזהה קטגוריה חסר' });
                      return;
                 }
@@ -120,7 +131,7 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
                 
                 const dataToSave: Omit<Chumash, 'id'> = {
                     name,
-                    order: isEditing && category.order ? category.order : totalCategories + 1
+                    order: isEditing && typeof category.order === 'number' ? category.order : totalCategories + 1
                 };
 
                 await setDoc(docRef, dataToSave, { merge: true });
@@ -386,5 +397,3 @@ export default function AdminParshiotPage() {
         </>
     );
 }
-
-    
