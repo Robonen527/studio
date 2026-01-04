@@ -264,7 +264,3 @@ async function seedParshiotAndChumashim(): Promise<void> {
 }
 
     
-
-    
-
-    

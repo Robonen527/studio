@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
 import { useUser, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs } from 'firebase/firestore';
-import { getParshiot } from '@/lib/actions';
+import { collection, getDocs, query } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 
 
@@ -34,10 +33,21 @@ export function DownloadInsightsButton() {
         fullText += `תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}\n`;
         fullText += '============================================\n\n';
 
-        const allParshiot = await getParshiot();
+        const parshiotSnapshot = await getDocs(query(collection(firestore, 'parshiot')));
+        const allParshiot = parshiotSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
+
+        if (allParshiot.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'מסד נתונים ריק',
+                description: 'לא נמצאו פרשות במסד הנתונים. אנא ודא שהנתונים הועלו.',
+            });
+            return;
+        }
+
 
         for (const parsha of allParshiot) {
-          const insightsRef = collection(firestore, `parshiot/${parsha.slug}/torahInsights`);
+          const insightsRef = collection(firestore, `parshiot/${parsha.id}/torahInsights`);
           const insightsSnapshot = await getDocs(insightsRef);
 
           if (!insightsSnapshot.empty) {
@@ -97,3 +107,5 @@ export function DownloadInsightsButton() {
     </div>
   );
 }
+
+    
