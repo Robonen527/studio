@@ -22,8 +22,8 @@ type ParshaDetailPageProps = {
 };
 
 export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
+  const { slug } = params;
   const [parsha, setParsha] = useState<Parsha | null>(null);
-  const [slug, setSlug] = useState('');
   const firestore = useFirestore();
   const [parshiot, setParshiot] = useState<Parsha[]>([]);
   const [parshaIndex, setParshaIndex] = useState(-1);
@@ -35,13 +35,6 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
     }
     loadParshiot();
   }, []);
-
-  useEffect(() => {
-    if (params.slug) {
-        setSlug(params.slug);
-    }
-  }, [params]);
-
 
   useEffect(() => {
     if (!slug) return;
