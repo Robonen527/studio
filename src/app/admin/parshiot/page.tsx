@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useTransition, useMemo } from 'react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Chumash, Parsha } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,11 +19,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { revalidateInsightPaths } from '@/lib/actions';
-import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { Database } from 'lucide-react';
 import { getStaticParshiotData } from '@/lib/static-data';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 // Helper to create a URL-friendly slug
 const createSlug = (name: string) => {
@@ -112,11 +113,22 @@ function EditChumashDialog({ chumash, totalChumashim, onFinished }: { chumash?: 
                     order: isEditing && chumash.order ? chumash.order : totalChumashim + 1
                 };
 
-                setDocumentNonBlocking(docRef, dataToSave, { merge: true });
+                await setDoc(docRef, dataToSave, { merge: true });
+                
                 await revalidateInsightPaths();
                 toast({ title: 'הקטגוריה נשמרה בהצלחה' });
                 onFinished();
-            } catch (e) {
+            } catch (e: any) {
+                console.error("Error saving category:", e);
+                const docRef = doc(firestore, 'chumashim', chumash ? chumash.id : createSlug(name));
+                 errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'write',
+                        requestResourceData: { name },
+                    })
+                );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הקטגוריה' });
             }
         });
@@ -159,11 +171,21 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
             try {
                 const id = parsha ? parsha.id : createSlug(name);
                 const docRef = doc(firestore, 'parshiot', id);
-                setDocumentNonBlocking(docRef, { name, chumashId, id }, { merge: true });
+                await setDoc(docRef, { name, chumashId, id }, { merge: true });
                 await revalidateInsightPaths(id);
                 toast({ title: 'הפרשה נשמרה בהצלחה' });
                 onFinished();
-            } catch (e) {
+            } catch (e: any) {
+                console.error("Error saving parsha:", e);
+                const docRef = doc(firestore, 'parshiot', parsha ? parsha.id : createSlug(name));
+                errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'write',
+                        requestResourceData: { name, chumashId },
+                    })
+                );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הפרשה' });
             }
         });
@@ -221,7 +243,7 @@ export default function AdminParshiotPage() {
         }, {} as Record<string, Parsha[]>);
     }, [parshiot]);
 
-    const handleDeleteChumash = (chumashId: string) => {
+    const handleDeleteChumash = async (chumashId: string) => {
         if (!firestore) return;
         if (parshiotByChumashId[chumashId]?.length > 0) {
             alert('לא ניתן למחוק קטגוריה שיש בה פרשות.');
@@ -229,17 +251,39 @@ export default function AdminParshiotPage() {
         }
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
             const docRef = doc(firestore, 'chumashim', chumashId);
-            deleteDocumentNonBlocking(docRef);
-            revalidateInsightPaths();
+            try {
+                await deleteDoc(docRef);
+                await revalidateInsightPaths();
+            } catch (e: any) {
+                 errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'delete',
+                    })
+                );
+                alert("אין לך הרשאה למחוק את הקטגוריה.");
+            }
         }
     };
 
-    const handleDeleteParsha = (parshaId: string) => {
+    const handleDeleteParsha = async (parshaId: string) => {
         if (!firestore) return;
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הפרשה? פעולה זו תמחק גם את כל דברי התורה המשויכים אליה.')) {
             const docRef = doc(firestore, 'parshiot', parshaId);
-            deleteDocumentNonBlocking(docRef);
-            revalidateInsightPaths(parshaId);
+            try {
+                await deleteDoc(docRef);
+                await revalidateInsightPaths(parshaId);
+            } catch(e: any) {
+                 errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'delete',
+                    })
+                );
+                 alert("אין לך הרשאה למחוק את הפרשה.");
+            }
         }
     };
     
