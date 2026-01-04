@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useMemo } from 'react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Chumash, Parsha } from '@/lib/types';
@@ -45,7 +45,7 @@ function EditChumashDialog({ chumash, onFinished }: { chumash?: Chumash, onFinis
             try {
                 const id = chumash ? chumash.id : createSlug(name);
                 const docRef = doc(firestore, 'chumashim', id);
-                await setDocumentNonBlocking(docRef, { name, order }, { merge: true });
+                setDocumentNonBlocking(docRef, { name, order, id }, { merge: true });
                 await revalidateInsightPaths();
                 toast({ title: 'החומש נשמר בהצלחה' });
                 onFinished();
@@ -96,7 +96,7 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
             try {
                 const id = parsha ? parsha.id : createSlug(name);
                 const docRef = doc(firestore, 'parshiot', id);
-                await setDocumentNonBlocking(docRef, { name, chumashId }, { merge: true });
+                setDocumentNonBlocking(docRef, { name, chumashId, id }, { merge: true });
                 await revalidateInsightPaths(id);
                 toast({ title: 'הפרשה נשמרה בהצלחה' });
                 onFinished();

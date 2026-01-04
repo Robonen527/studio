@@ -7,37 +7,23 @@ import { HDate, Sedra } from 'hebcal';
 import { initializeAdminApp } from "@/firebase/server";
 import { doc, getDoc, collection, getDocs, orderBy, query as adminQuery } from "firebase-admin/firestore";
 
-async function isFirestoreEmpty() {
+async function isFirestoreEmpty(collectionName: string) {
     const { firestore } = await initializeAdminApp();
-    const parshiotRef = collection(firestore, 'parshiot');
-    const snapshot = await getDocs(parshiotRef);
+    const collectionRef = collection(firestore, collectionName);
+    const snapshot = await getDocs(collectionRef);
     return snapshot.empty;
 }
 
 export async function getParshiot(): Promise<Parsha[]> {
   try {
-    const empty = await isFirestoreEmpty();
-    if (empty) {
-        console.log('No parshiot found in Firestore. Seeding now.');
-        await seedParshiotAndChumashim();
-    }
-  } catch(e) {
-    // Log the error but don't stop execution. Assume data might exist anyway.
-    console.error("Error during initial check/seed:", e);
-  }
-    
-  try {
     const { firestore } = await initializeAdminApp();
     const parshiotRef = collection(firestore, 'parshiot');
     const snapshot = await getDocs(parshiotRef);
-    const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
-    
-    // If parshiot are still empty after the attempt, it might mean seeding failed and we should retry once.
-    if (parshiot.length === 0) {
-        console.log('Still no parshiot, attempting to seed again.');
+    if (snapshot.empty) {
         return await seedParshiotAndChumashim();
     }
-
+    const parshiot: Parsha[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Parsha));
+    
     const chumashim = await getChumashim();
     const chumashOrderMap = new Map(chumashim.map(c => [c.id, c.order]));
 
@@ -50,8 +36,15 @@ export async function getParshiot(): Promise<Parsha[]> {
     return parshiot;
 
   } catch (e) {
-    console.error("Error in getParshiot after attempting to seed:", e);
-    return []; // Return empty array on final failure
+    console.error("Error in getParshiot:", e);
+    // If there's an error (e.g. auth), it might be a first run.
+    // Try seeding. If that fails, it will throw.
+    try {
+        return await seedParshiotAndChumashim();
+    } catch (seedError) {
+        console.error("Failed to seed and get parshiot:", seedError);
+        return []; // Return empty on final failure
+    }
   }
 }
 
@@ -145,6 +138,7 @@ export async function revalidateInsightPaths(parshaSlug?: string) {
 }
 
 async function seedParshiotAndChumashim(): Promise<Parsha[]> {
+    console.log("Attempting to seed Chumashim and Parshiot...");
     const { firestore } = await initializeAdminApp();
     const batch = firestore.batch();
 
@@ -161,7 +155,7 @@ async function seedParshiotAndChumashim(): Promise<Parsha[]> {
     chumashimData.forEach((chumash, index) => {
         const chumashId = chumashIds[index];
         const chumashRef = doc(firestore, 'chumashim', chumashId);
-        batch.set(chumashRef, chumash);
+        batch.set(chumashRef, {...chumash, id: chumashId});
     });
 
     const parshiotData: { slug: string; name: string, chumashIndex: number }[] = [
@@ -221,22 +215,17 @@ async function seedParshiotAndChumashim(): Promise<Parsha[]> {
       { slug: 'vezot-haberakhah', name: 'וזאת הברכה', chumashIndex: 4 },
     ];
     
-    const finalParshiot: Parsha[] = parshiotData.map(p => {
+    const finalParshiot: Parsha[] = [];
+    parshiotData.forEach(p => {
         const parshaRef = doc(firestore, 'parshiot', p.slug);
-        const parshaDoc = { name: p.name, chumashId: chumashIds[p.chumashIndex] };
+        const chumashId = chumashIds[p.chumashIndex];
+        const parshaDoc = { name: p.name, chumashId: chumashId, id: p.slug };
         batch.set(parshaRef, parshaDoc);
-        return { id: p.slug, ...parshaDoc };
+        finalParshiot.push(parshaDoc as Parsha);
     });
 
     await batch.commit();
     console.log('Successfully seeded Chumashim and Parshiot.');
-    // Re-fetch after seeding to ensure sorting
-    const { firestore: fs2 } = await initializeAdminApp();
-    const parshiotRef = collection(fs2, 'parshiot');
-    const snapshot = await getDocs(parshiotRef);
-    return snapshot.docs.map(d => ({id: d.id, ...d.data()}) as Parsha);
+    
+    return finalParshiot;
 }
-
-    
-
-    
