@@ -16,12 +16,14 @@ import { SetCurrentParsha } from '@/components/SetCurrentParsha';
 export default function Home() {
   const [currentParsha, setCurrentParsha] = useState<Parsha | null>(null);
   const firestore = useFirestore();
+  const [isLoadingParsha, setIsLoadingParsha] = useState(true);
   
-  // This combines fetching manual and date-based parsha
   useEffect(() => {
     async function fetchCurrentParsha() {
+      setIsLoadingParsha(true);
       const parsha = await getCurrentParsha();
       setCurrentParsha(parsha);
+      setIsLoadingParsha(false);
     }
     fetchCurrentParsha();
   }, []);
@@ -39,7 +41,7 @@ export default function Home() {
   const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   const latestInsight = insights?.[0];
 
-  const isLoading = !currentParsha;
+  const isLoading = isLoadingParsha || !currentParsha;
 
   if (isLoading) {
     return (

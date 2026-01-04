@@ -1,13 +1,14 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lightbulb } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getParshiotWithChumash } from '@/lib/actions';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Chumash, Parsha } from '@/lib/types';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 
 type ChumashWithParshiot = Chumash & {
@@ -15,19 +16,38 @@ type ChumashWithParshiot = Chumash & {
 }
 
 export default function ParshiotPage() {
-  const [data, setData] = useState<ChumashWithParshiot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const firestore = useFirestore();
+
+  const chumashimQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'chumashim'), orderBy('order')) : null, [firestore]);
+  const { data: chumashim, isLoading: isLoadingChumashim } = useCollection<Chumash>(chumashimQuery);
+
+  const parshiotQuery = useMemoFirebase(() => firestore ? collection(firestore, 'parshiot') : null, [firestore]);
+  const { data: parshiot, isLoading: isLoadingParshiot } = useCollection<Parsha>(parshiotQuery);
+
+  const data = useMemo(() => {
+    if (!chumashim || !parshiot) return [];
+    
+    const parshiotByChumashId = parshiot.reduce((acc, parsha) => {
+        if (!acc[parsha.chumashId]) {
+          acc[parsha.chumashId] = [];
+        }
+        acc[parsha.chumashId].push(parsha);
+        return acc;
+    }, {} as Record<string, Parsha[]>);
+
+    return chumashim.map(chumash => ({
+        ...chumash,
+        parshiot: parshiotByChumashId[chumash.id] || []
+    }));
+
+  }, [chumashim, parshiot]);
+
 
   useEffect(() => {
     document.title = 'כל הפרשות | מאיר בפרשה';
-    async function loadData() {
-        setIsLoading(true);
-        const parshiotWithChumash = await getParshiotWithChumash();
-        setData(parshiotWithChumash);
-        setIsLoading(false);
-    }
-    loadData();
   }, []);
+
+  const isLoading = isLoadingChumashim || isLoadingParshiot;
 
   if (isLoading) {
       return (
@@ -53,7 +73,7 @@ export default function ParshiotPage() {
   return (
     <div className="container mx-auto px-4 py-8 md:py-12">
       <div className="text-center mb-12">
-        <h1 className="font-headline text-4xl md:text-5xl text-primary">כל הפרשות</h1>
+        <h1 className="font-headline text-4xl md:text-5xl text-primary">כל הקטגוריות</h1>
         <p className="mt-2 text-md md:text-lg text-muted-foreground">בחר פרשה כדי לקרוא את דברי התורה עליה</p>
       </div>
 
@@ -83,5 +103,3 @@ export default function ParshiotPage() {
     </div>
   );
 }
-
-    
