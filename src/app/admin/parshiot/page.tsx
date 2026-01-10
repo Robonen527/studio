@@ -303,6 +303,53 @@ function DeleteParshaDialog({ parsha, onFinished }: { parsha: Parsha, onFinished
     );
 }
 
+function DeleteCategoryDialog({ category, onFinished }: { category: Chumash, onFinished: () => void }) {
+    const [isPending, startTransition] = useTransition();
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    const handleDelete = () => {
+        if (!firestore) return;
+
+        startTransition(async () => {
+            const docRef = doc(firestore, 'chumashim', category.id);
+            try {
+                await deleteDoc(docRef);
+                await revalidateInsightPaths();
+                toast({ title: "הקטגוריה נמחקה בהצלחה" });
+                onFinished();
+            } catch (e: any) {
+                errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'delete',
+                    })
+                );
+                toast({ variant: "destructive", title: "שגיאה", description: "אין לך הרשאה למחוק את הקטגוריה." });
+            } finally {
+                onFinished();
+            }
+        });
+    };
+
+    return (
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    פעולה זו תמחק את קטגוריית &quot;{category.name}&quot; לצמיתות. ניתן למחוק קטגוריה רק אם היא ריקה מפרשות.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={onFinished}>ביטול</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                    {isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'מחק לצמיתות'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    );
+}
 
 
 export default function AdminParshiotPage() {
@@ -335,31 +382,6 @@ export default function AdminParshiotPage() {
         }, {} as Record<string, Parsha[]>);
     }, [parshiot]);
 
-    const handleDeleteCategory = async (categoryId: string) => {
-        if (!firestore) return;
-        if (parshiotByCategoryId[categoryId]?.length > 0) {
-            toast({ variant: "destructive", title: "לא ניתן למחוק", description: "לא ניתן למחוק קטגוריה שיש בה פרשות." });
-            return;
-        }
-        if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
-            const docRef = doc(firestore, 'chumashim', categoryId);
-            try {
-                await deleteDoc(docRef);
-                await revalidateInsightPaths();
-                toast({ title: "הקטגוריה נמחקה בהצלחה" });
-            } catch (e: any) {
-                 errorEmitter.emit(
-                    'permission-error',
-                    new FirestorePermissionError({
-                        path: docRef.path,
-                        operation: 'delete',
-                    })
-                );
-                toast({ variant: "destructive", title: "שגיאה", description: "אין לך הרשאה למחוק את הקטגוריה." });
-            }
-        }
-    };
-    
     const isLoading = isUserLoading || isLoadingCategories || isLoadingParshiot;
     const isDataEmpty = !isLoading && (!categories || categories.length === 0);
 
@@ -408,9 +430,20 @@ export default function AdminParshiotPage() {
                                     <Button variant="ghost" size="icon" onClick={() => setDialog({ type: 'category', payload: category })}>
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteCategory(category.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="text-destructive hover:text-destructive"
+                                                disabled={(parshiotByCategoryId[category.id] || []).length > 0}
+                                                title={(parshiotByCategoryId[category.id] || []).length > 0 ? "לא ניתן למחוק קטגוריה שיש בה פרשות" : "מחק קטגוריה"}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <DeleteCategoryDialog category={category} onFinished={() => {}} />
+                                    </AlertDialog>
                                     <Button variant="outline" size="sm" onClick={() => setDialog({type: 'parsha', payload: {chumashId: category.id}})}>
                                         <Plus className="ml-2 h-4 w-4" />
                                         הוסף פרשה
@@ -454,5 +487,3 @@ export default function AdminParshiotPage() {
         </>
     );
 }
-
-    
