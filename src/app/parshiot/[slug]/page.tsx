@@ -170,9 +170,15 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
         </div>
       )}
 
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+        <Button asChild>
+          <Link href="/parshiot">
+            לכל הפרשות
+          </Link>
+        </Button>
+      </div>
+
       <ParshaNavigation allParshiot={allParshiot} currentSlug={params.slug} />
     </div>
   );
 }
-
-    
