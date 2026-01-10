@@ -83,7 +83,7 @@ export function DateDisplay() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse md:py-0">
         <CalendarDays className="h-4 w-4" />
         <div className="h-4 bg-muted rounded w-48"></div>
       </div>
@@ -91,7 +91,7 @@ export function DateDisplay() {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground py-1 md:py-0">
       <div className="flex items-center gap-1.5">
         <CalendarDays className="h-4 w-4" />
         <span>{gregorianDate}</span>
