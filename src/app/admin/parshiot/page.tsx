@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useTransition, useMemo } from 'react';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import type { Chumash, Parsha } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,34 +54,27 @@ function SeedButton() {
         }
 
         startTransition(async () => {
-            try {
-                const batch = writeBatch(firestore);
-                const { chumashim, parshiot } = getStaticParshiotData();
-                
-                chumashim.forEach(chumash => {
-                    const chumashRef = doc(firestore, 'chumashim', chumash.id);
-                    batch.set(chumashRef, chumash);
-                });
+            const batch = writeBatch(firestore);
+            const { chumashim, parshiot } = getStaticParshiotData();
+            
+            chumashim.forEach(chumash => {
+                const chumashRef = doc(firestore, 'chumashim', chumash.id);
+                batch.set(chumashRef, chumash);
+            });
 
-                parshiot.forEach(parsha => {
-                    const parshaRef = doc(firestore, 'parshiot', parsha.id);
-                    batch.set(parshaRef, parsha);
-                });
-                
-                await batch.commit();
-
-                // Call the server action to revalidate paths
+            parshiot.forEach(parsha => {
+                const parshaRef = doc(firestore, 'parshiot', parsha.id);
+                batch.set(parshaRef, parsha);
+            });
+            
+            batch.commit().then(async () => {
                 await revalidateInsightPaths();
-
                 toast({
                     title: "הצלחה",
                     description: "מסד הנתונים אותחל בהצלחה. רענן את הדף כדי לראות את הנתונים."
                 });
-
-                // Optionally trigger a page reload
                 window.location.reload();
-
-            } catch(e: any) {
+            }).catch((e: any) => {
                 console.error(e);
                 const permissionError = new FirestorePermissionError({
                     path: 'batch operation',
@@ -93,7 +86,7 @@ function SeedButton() {
                     title: "שגיאה",
                     description: "אירעה שגיאה בעת אתחול מסד הנתונים."
                 })
-            }
+            });
         });
     }
 
@@ -118,30 +111,28 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
             toast({ variant: 'destructive', title: 'שם הקטגוריה חסר' });
             return;
         }
+        
+        const isEditing = !!category;
+        const id = isEditing ? category.id : createSlug(name);
+        
+        if (!id) {
+            toast({ variant: 'destructive', title: 'מזהה קטגוריה חסר' });
+            return;
+        }
+
         startTransition(async () => {
-            try {
-                const isEditing = !!category;
-                const id = isEditing ? category.id : createSlug(name);
-                 if (!id) {
-                     toast({ variant: 'destructive', title: 'מזהה קטגוריה חסר' });
-                     return;
-                }
+            const docRef = doc(firestore, 'chumashim', id);
+            
+            const dataToSave: Omit<Chumash, 'id'> = {
+                name,
+                order: isEditing && typeof category.order === 'number' ? category.order : totalCategories + 1
+            };
 
-                const docRef = doc(firestore, 'chumashim', id);
-                
-                const dataToSave: Omit<Chumash, 'id'> = {
-                    name,
-                    order: isEditing && typeof category.order === 'number' ? category.order : totalCategories + 1
-                };
-
-                await setDoc(docRef, dataToSave, { merge: true });
-                
+            setDoc(docRef, dataToSave, { merge: true }).then(async () => {
                 await revalidateInsightPaths();
                 toast({ title: 'הקטגוריה נשמרה בהצלחה' });
                 onFinished();
-            } catch (e: any) {
-                const docId = category ? category.id : createSlug(name);
-                const docRef = doc(firestore, 'chumashim', docId);
+            }).catch((e: any) => {
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -151,7 +142,7 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
                     })
                 );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הקטגוריה' });
-            }
+            });
         });
     };
 
@@ -189,16 +180,21 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
             toast({ variant: 'destructive', title: 'שם הפרשה חסר' });
             return;
         }
+
+        const id = parsha ? parsha.id : createSlug(name);
+        if (!id) {
+            toast({ variant: 'destructive', title: 'מזהה פרשה חסר' });
+            return;
+        }
+
+
         startTransition(async () => {
-            try {
-                const id = parsha ? parsha.id : createSlug(name);
-                const docRef = doc(firestore, 'parshiot', id);
-                await setDoc(docRef, { name, chumashId, id }, { merge: true });
+            const docRef = doc(firestore, 'parshiot', id);
+            setDoc(docRef, { name, chumashId, id }, { merge: true }).then(async () => {
                 await revalidateInsightPaths(id);
                 toast({ title: 'הפרשה נשמרה בהצלחה' });
                 onFinished();
-            } catch (e: any) {
-                const docRef = doc(firestore, 'parshiot', parsha ? parsha.id : createSlug(name));
+            }).catch((e: any) => {
                 errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -208,7 +204,7 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
                     })
                 );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הפרשה' });
-            }
+            });
         });
     };
 
@@ -272,10 +268,9 @@ export default function AdminParshiotPage() {
         }
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
             const docRef = doc(firestore, 'chumashim', categoryId);
-            try {
-                await deleteDoc(docRef);
+            deleteDoc(docRef).then(async () => {
                 await revalidateInsightPaths();
-            } catch (e: any) {
+            }).catch((e: any) => {
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -284,18 +279,31 @@ export default function AdminParshiotPage() {
                     })
                 );
                 alert("אין לך הרשאה למחוק את הקטגוריה.");
-            }
+            });
         }
     };
 
     const handleDeleteParsha = async (parshaId: string) => {
         if (!firestore) return;
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הפרשה? פעולה זו תמחק גם את כל דברי התורה המשויכים אליה.')) {
-            const docRef = doc(firestore, 'parshiot', parshaId);
             try {
+                // First, delete all insights in the subcollection
+                const insightsRef = collection(firestore, `parshiot/${parshaId}/torahInsights`);
+                const insightsSnapshot = await getDocs(insightsRef);
+                const batch = writeBatch(firestore);
+                insightsSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+
+                // Then, delete the parsha document itself
+                const docRef = doc(firestore, 'parshiot', parshaId);
                 await deleteDoc(docRef);
+
+                // Revalidate paths
                 await revalidateInsightPaths(parshaId);
             } catch(e: any) {
+                 const docRef = doc(firestore, 'parshiot', parshaId);
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -303,7 +311,7 @@ export default function AdminParshiotPage() {
                         operation: 'delete',
                     })
                 );
-                 alert("אין לך הרשאה למחוק את הפרשה.");
+                 alert("אין לך הרשאה למחוק את הפרשה או את דברי התורה המשויכים אליה.");
             }
         }
     };
