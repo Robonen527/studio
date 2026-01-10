@@ -1,6 +1,7 @@
 
-"use client";
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { AddInsightButton } from "@/components/add-insight-button";
@@ -10,6 +11,10 @@ import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import type { Insight, Parsha } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getParshiot } from '@/lib/actions';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ParshaDetailPageProps = {
   params: {
@@ -17,8 +22,52 @@ type ParshaDetailPageProps = {
   };
 };
 
+function ParshaNavigation({ allParshiot, currentSlug }: { allParshiot: Parsha[], currentSlug: string }) {
+  const currentIndex = useMemo(() => 
+    allParshiot.findIndex(p => p.id === currentSlug),
+    [allParshiot, currentSlug]
+  );
+
+  if (currentIndex === -1) return null;
+
+  const prevParsha = currentIndex > 0 ? allParshiot[currentIndex - 1] : null;
+  const nextParsha = currentIndex < allParshiot.length - 1 ? allParshiot[currentIndex + 1] : null;
+
+  return (
+    <>
+      {prevParsha && (
+        <Button asChild className="fixed bottom-6 right-4 z-40 shadow-lg animate-in fade-in slide-in-from-right">
+          <Link href={`/parshiot/${prevParsha.id}`}>
+             <span className="hidden md:inline">לפרשה הקודמת: {prevParsha.name}</span>
+             <ArrowRight className="md:mr-2" />
+          </Link>
+        </Button>
+      )}
+      {nextParsha && (
+        <Button asChild className="fixed bottom-6 left-4 z-40 shadow-lg animate-in fade-in slide-in-from-left">
+          <Link href={`/parshiot/${nextParsha.id}`}>
+            <ArrowLeft className="md:ml-2" />
+            <span className="hidden md:inline">לפרשה הבאה: {nextParsha.name}</span>
+          </Link>
+        </Button>
+      )}
+    </>
+  );
+}
+
+
 export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   const firestore = useFirestore();
+  const [allParshiot, setAllParshiot] = useState<Parsha[]>([]);
+
+  // Fetch all parshiot for navigation
+  useEffect(() => {
+    async function loadParshiot() {
+      const p = await getParshiot();
+      setAllParshiot(p);
+    }
+    loadParshiot();
+  }, []);
 
   // Use useDoc to fetch the parsha data in real-time
   const parshaDocRef = useMemoFirebase(() => {
@@ -44,7 +93,9 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
 
   const { data: insights, isLoading: isLoadingInsights } = useCollection<Insight>(insightsQuery);
   
-  if (isLoadingParsha) {
+  const isLoading = isLoadingParsha || allParshiot.length === 0;
+
+  if (isLoading) {
     return (
        <div className="container mx-auto px-4 py-8 md:py-12">
         <Skeleton className="h-12 w-1/3 mb-8" />
@@ -69,7 +120,7 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12">
+    <div className="container mx-auto px-4 py-8 md:py-12 pb-24">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div className="mb-4 md:mb-0 text-center md:text-right w-full">
           <h1 className="font-headline text-3xl md:text-5xl text-primary">פרשת {parsha.name}</h1>
@@ -118,6 +169,10 @@ export default function ParshaDetailPage({ params }: ParshaDetailPageProps) {
           </div>
         </div>
       )}
+
+      <ParshaNavigation allParshiot={allParshiot} currentSlug={params.slug} />
     </div>
   );
 }
+
+    
