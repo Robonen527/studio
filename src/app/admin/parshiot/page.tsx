@@ -15,6 +15,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -234,12 +246,71 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
     )
 }
 
+function DeleteParshaDialog({ parsha, onFinished }: { parsha: Parsha, onFinished: () => void }) {
+    const [isPending, startTransition] = useTransition();
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    const handleDelete = () => {
+        if (!firestore) return;
+
+        startTransition(async () => {
+            try {
+                const insightsRef = collection(firestore, `parshiot/${parsha.id}/torahInsights`);
+                const insightsSnapshot = await getDocs(insightsRef);
+                const batch = writeBatch(firestore);
+                insightsSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+
+                const docRef = doc(firestore, 'parshiot', parsha.id);
+                await deleteDoc(docRef);
+
+                await revalidateInsightPaths(parsha.id);
+                toast({ title: "הצלחה", description: "הפרשה וכל דברי התורה המשויכים אליה נמחקו." });
+                onFinished();
+            } catch (e: any) {
+                const docRef = doc(firestore, 'parshiot', parsha.id);
+                errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'delete',
+                    })
+                );
+                toast({ variant: "destructive", title: "שגיאה", description: "אין לך הרשאה למחוק את הפרשה." });
+                onFinished();
+            }
+        });
+    };
+
+    return (
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    פעולה זו תמחק את פרשת &quot;{parsha.name}&quot; לצמיתות, כולל כל דברי התורה המשויכים אליה.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={onFinished}>ביטול</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                    {isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'מחק לצמיתות'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    );
+}
+
+
 
 export default function AdminParshiotPage() {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
     const firestore = useFirestore();
-    const [dialog, setDialog] = useState<{ type: 'category' | 'parsha'; payload?: any } | null>(null);
+    const [dialog, setDialog] = useState<{ type: string; payload?: any } | null>(null);
+    const { toast } = useToast();
 
     const chumashimQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'chumashim'), orderBy('order')) : null, [firestore]);
     const { data: categories, isLoading: isLoadingCategories } = useCollection<Chumash>(chumashimQuery);
@@ -267,7 +338,7 @@ export default function AdminParshiotPage() {
     const handleDeleteCategory = async (categoryId: string) => {
         if (!firestore) return;
         if (parshiotByCategoryId[categoryId]?.length > 0) {
-            alert('לא ניתן למחוק קטגוריה שיש בה פרשות.');
+            toast({ variant: "destructive", title: "לא ניתן למחוק", description: "לא ניתן למחוק קטגוריה שיש בה פרשות." });
             return;
         }
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
@@ -275,6 +346,7 @@ export default function AdminParshiotPage() {
             try {
                 await deleteDoc(docRef);
                 await revalidateInsightPaths();
+                toast({ title: "הקטגוריה נמחקה בהצלחה" });
             } catch (e: any) {
                  errorEmitter.emit(
                     'permission-error',
@@ -283,40 +355,7 @@ export default function AdminParshiotPage() {
                         operation: 'delete',
                     })
                 );
-                alert("אין לך הרשאה למחוק את הקטגוריה.");
-            }
-        }
-    };
-
-    const handleDeleteParsha = async (parshaId: string) => {
-        if (!firestore) return;
-        if (window.confirm('האם אתה בטוח שברצונך למחוק את הפרשה? פעולה זו תמחק גם את כל דברי התורה המשויכים אליה.')) {
-            try {
-                // First, delete all insights in the subcollection
-                const insightsRef = collection(firestore, `parshiot/${parshaId}/torahInsights`);
-                const insightsSnapshot = await getDocs(insightsRef);
-                const batch = writeBatch(firestore);
-                insightsSnapshot.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-
-                // Then, delete the parsha document itself
-                const docRef = doc(firestore, 'parshiot', parshaId);
-                await deleteDoc(docRef);
-
-                // Revalidate paths
-                await revalidateInsightPaths(parshaId);
-            } catch(e: any) {
-                 const docRef = doc(firestore, 'parshiot', parshaId);
-                 errorEmitter.emit(
-                    'permission-error',
-                    new FirestorePermissionError({
-                        path: docRef.path,
-                        operation: 'delete',
-                    })
-                );
-                 alert("אין לך הרשאה למחוק את הפרשה או את דברי התורה המשויכים אליה.");
+                toast({ variant: "destructive", title: "שגיאה", description: "אין לך הרשאה למחוק את הקטגוריה." });
             }
         }
     };
@@ -387,9 +426,14 @@ export default function AdminParshiotPage() {
                                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDialog({ type: 'parsha', payload: { parsha, chumashId: category.id }})}>
                                                     <Edit className="h-3 w-3" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteParsha(parsha.id)}>
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive">
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <DeleteParshaDialog parsha={parsha} onFinished={() => {}} />
+                                                </AlertDialog>
                                             </div>
                                         </div>
                                     ))}
@@ -403,10 +447,12 @@ export default function AdminParshiotPage() {
                 </div>
             </div>
 
-            <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
+            <Dialog open={!!dialog && (dialog.type === 'category' || dialog.type === 'parsha')} onOpenChange={(open) => !open && setDialog(null)}>
                 {dialog?.type === 'category' && <EditCategoryDialog category={dialog.payload} totalCategories={categories?.length || 0} onFinished={() => setDialog(null)} />}
                 {dialog?.type === 'parsha' && <EditParshaDialog parsha={dialog.payload?.parsha} chumashId={dialog.payload.chumashId} onFinished={() => setDialog(null)} />}
             </Dialog>
         </>
     );
 }
+
+    
