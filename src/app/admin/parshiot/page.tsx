@@ -67,14 +67,15 @@ function SeedButton() {
                 batch.set(parshaRef, parsha);
             });
             
-            batch.commit().then(async () => {
+            try {
+                await batch.commit();
                 await revalidateInsightPaths();
                 toast({
                     title: "הצלחה",
                     description: "מסד הנתונים אותחל בהצלחה. רענן את הדף כדי לראות את הנתונים."
                 });
                 window.location.reload();
-            }).catch((e: any) => {
+            } catch (e: any) {
                 console.error(e);
                 const permissionError = new FirestorePermissionError({
                     path: 'batch operation',
@@ -85,8 +86,8 @@ function SeedButton() {
                     variant: "destructive",
                     title: "שגיאה",
                     description: "אירעה שגיאה בעת אתחול מסד הנתונים."
-                })
-            });
+                });
+            }
         });
     }
 
@@ -128,11 +129,12 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
                 order: isEditing && typeof category.order === 'number' ? category.order : totalCategories + 1
             };
 
-            setDoc(docRef, dataToSave, { merge: true }).then(async () => {
+            try {
+                await setDoc(docRef, dataToSave, { merge: true });
                 await revalidateInsightPaths();
                 toast({ title: 'הקטגוריה נשמרה בהצלחה' });
                 onFinished();
-            }).catch((e: any) => {
+            } catch(e) {
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -142,7 +144,7 @@ function EditCategoryDialog({ category, totalCategories, onFinished }: { categor
                     })
                 );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הקטגוריה' });
-            });
+            }
         });
     };
 
@@ -190,11 +192,13 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
 
         startTransition(async () => {
             const docRef = doc(firestore, 'parshiot', id);
-            setDoc(docRef, { name, chumashId, id }, { merge: true }).then(async () => {
+            
+            try {
+                await setDoc(docRef, { name, chumashId, id }, { merge: true });
                 await revalidateInsightPaths(id);
                 toast({ title: 'הפרשה נשמרה בהצלחה' });
                 onFinished();
-            }).catch((e: any) => {
+            } catch (e: any) {
                 errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -204,7 +208,7 @@ function EditParshaDialog({ parsha, chumashId, onFinished }: { parsha?: Parsha, 
                     })
                 );
                 toast({ variant: 'destructive', title: 'שגיאה בשמירת הפרשה' });
-            });
+            }
         });
     };
 
@@ -268,9 +272,10 @@ export default function AdminParshiotPage() {
         }
         if (window.confirm('האם אתה בטוח שברצונך למחוק את הקטגוריה?')) {
             const docRef = doc(firestore, 'chumashim', categoryId);
-            deleteDoc(docRef).then(async () => {
+            try {
+                await deleteDoc(docRef);
                 await revalidateInsightPaths();
-            }).catch((e: any) => {
+            } catch (e: any) {
                  errorEmitter.emit(
                     'permission-error',
                     new FirestorePermissionError({
@@ -279,7 +284,7 @@ export default function AdminParshiotPage() {
                     })
                 );
                 alert("אין לך הרשאה למחוק את הקטגוריה.");
-            });
+            }
         }
     };
 
