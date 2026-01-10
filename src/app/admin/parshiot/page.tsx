@@ -445,9 +445,9 @@ export default function AdminParshiotPage() {
                                         </AlertDialogTrigger>
                                         <DeleteCategoryDialog category={category} onFinished={() => {}} />
                                     </AlertDialog>
-                                    <Button variant="outline" size="sm" onClick={() => setDialog({type: 'parsha', payload: {chumashId: category.id}})}>
-                                        <Plus className="ml-2 h-4 w-4" />
-                                        הוסף פרשה
+                                    <Button variant="outline" size="sm" onClick={() => setDialog({type: 'parsha', payload: {chumashId: category.id}})} className="p-2 md:p-2 md:px-3">
+                                        <Plus className="h-4 w-4 md:ml-2" />
+                                        <span className="hidden md:inline">הוסף פרשה</span>
                                     </Button>
                                 </div>
                             </CardHeader>
