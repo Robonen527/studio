@@ -407,7 +407,7 @@ export default function AdminParshiotPage() {
 
     return (
         <>
-            <div className="container mx-auto px-4 py-8 md:py-12">
+            <div className="container mx-auto px-4 py-8 md:py-12 pb-24">
                 <div className="flex justify-between items-center mb-12">
                     <div>
                         <h1 className="font-headline text-4xl md:text-5xl text-primary">ניהול פרשות וקטגוריות</h1>
@@ -415,12 +415,6 @@ export default function AdminParshiotPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         {isDataEmpty && <SeedButton />}
-                         <Button variant="outline" asChild>
-                            <Link href="/parshiot">
-                                <ArrowLeft className="ml-2 h-4 w-4" />
-                                מעבר לכל הפרשות
-                            </Link>
-                        </Button>
                         <Button onClick={() => setDialog({ type: 'category' })}>
                             <Plus className="ml-2" />
                             הוסף קטגוריה
@@ -485,6 +479,15 @@ export default function AdminParshiotPage() {
                         </Card>
                     ))}
                 </div>
+            </div>
+
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+                <Button asChild size="lg" className="shadow-2xl">
+                    <Link href="/parshiot">
+                        <ArrowLeft className="ml-2 h-4 w-4" />
+                        מעבר לכל הפרשות
+                    </Link>
+                </Button>
             </div>
 
             <Dialog open={!!dialog && (dialog.type === 'category' || dialog.type === 'parsha')} onOpenChange={(open) => !open && setDialog(null)}>
