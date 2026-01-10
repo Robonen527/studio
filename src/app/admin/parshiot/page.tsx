@@ -2,12 +2,13 @@
 'use client';
 
 import { useState, useEffect, useTransition, useMemo } from 'react';
+import Link from 'next/link';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, writeBatch, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import type { Chumash, Parsha } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Trash2, Edit } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, ArrowLeft } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -414,6 +415,12 @@ export default function AdminParshiotPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         {isDataEmpty && <SeedButton />}
+                         <Button variant="outline" asChild>
+                            <Link href="/parshiot">
+                                <ArrowLeft className="ml-2 h-4 w-4" />
+                                מעבר לכל הפרשות
+                            </Link>
+                        </Button>
                         <Button onClick={() => setDialog({ type: 'category' })}>
                             <Plus className="ml-2" />
                             הוסף קטגוריה
